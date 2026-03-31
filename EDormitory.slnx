@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/" />
+  <Folder Name="/src/backend/">
+    <Project Path="src/backend/EDormitory.Api/EDormitory.Api.csproj" />
+    <Project Path="src/backend/EDormitory.Application/EDormitory.Application.csproj" />
+    <Project Path="src/backend/EDormitory.Domain/EDormitory.Domain.csproj" />
+    <Project Path="src/backend/EDormitory.Infrastructure/EDormitory.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/EDormitory.Domain.Tests/EDormitory.Domain.Tests.csproj" />
+    <Project Path="tests/EDormitory.IntegrationTests/EDormitory.IntegrationTests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,17 @@
+bin/
+obj/
+node_modules/
+dist/
+.idea/
+.vscode/
+storage/
+storage-dev/
+*.user
+*.suo
+*.db
+*.sqlite
+*.log
+coverage/
+Requirements/
+out/
+tmp-ticket-upload.png

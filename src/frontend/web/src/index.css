@@ -1,0 +1,66 @@
+@import "@fontsource/manrope/400.css";
+@import "@fontsource/manrope/500.css";
+@import "@fontsource/manrope/600.css";
+@import "@fontsource/manrope/700.css";
+@import "@fontsource/fraunces/600.css";
+@import "@fontsource/fraunces/700.css";
+@import "tailwindcss";
+
+:root {
+  font-family: "Manrope", "Segoe UI", sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color: #102131;
+  background:
+    radial-gradient(circle at top left, rgba(20, 88, 95, 0.12), transparent 32%),
+    radial-gradient(circle at top right, rgba(17, 63, 93, 0.1), transparent 28%),
+    linear-gradient(180deg, #f4f1ea 0%, #edf2f3 100%);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  --color-page: #f5f3ee;
+  --color-surface: rgba(255, 255, 255, 0.88);
+  --color-panel-soft: rgba(242, 246, 247, 0.96);
+  --color-accent: #0f6b73;
+  --color-accent-soft: rgba(15, 107, 115, 0.18);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(20, 88, 95, 0.12), transparent 32%),
+    radial-gradient(circle at top right, rgba(17, 63, 93, 0.1), transparent 28%),
+    linear-gradient(180deg, #f4f1ea 0%, #edf2f3 100%);
+  color: #102131;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.font-display {
+  font-family: "Fraunces", Georgia, serif;
+}

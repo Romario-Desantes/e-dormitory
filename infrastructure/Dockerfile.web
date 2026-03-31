@@ -1,0 +1,17 @@
+FROM node:24-alpine AS build
+WORKDIR /app
+ARG VITE_API_BASE_URL=/api
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+
+COPY src/frontend/web/package*.json ./
+RUN npm ci
+
+COPY src/frontend/web ./
+RUN npm run build
+
+FROM node:24-alpine AS runtime
+WORKDIR /app
+RUN npm install -g serve
+COPY --from=build /app/dist /usr/share/nginx/html
+EXPOSE 80
+CMD ["serve", "-s", "/usr/share/nginx/html", "-l", "80"]
