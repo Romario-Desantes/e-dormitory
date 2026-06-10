@@ -10,6 +10,13 @@ namespace EDormitory.Api.Controllers;
 public sealed class NotificationsController(INotificationService notificationService) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyCollection<NotificationResponse>>> GetNotifications(CancellationToken cancellationToken) =>
+    public async Task<ActionResult<NotificationFeedResponse>> GetNotifications(CancellationToken cancellationToken) =>
         Ok(await notificationService.GetNotificationsAsync(cancellationToken));
+
+    [HttpPost("read")]
+    public async Task<IActionResult> MarkRead(CancellationToken cancellationToken)
+    {
+        await notificationService.MarkNotificationsReadAsync(cancellationToken);
+        return NoContent();
+    }
 }

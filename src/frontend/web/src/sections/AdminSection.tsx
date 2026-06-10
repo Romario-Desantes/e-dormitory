@@ -54,7 +54,7 @@ export function AdminSection() {
   })
 
   return (
-    <SectionFrame id="admin-hub" title="Адмін" description="Користувачі, довідники та базові системні налаштування seed-рівня.">
+    <SectionFrame id="admin-hub" title="Адмін" description="Користувачі, довідники та базові системні налаштування.">
       {notice ? <div className="mb-6 rounded-[1.5rem] border border-emerald-300 bg-emerald-50 px-5 py-4 text-emerald-900">{notice}</div> : null}
       <div className="grid gap-6 xl:grid-cols-2">
         <Card title="Створити користувача" subtitle="Акаунти створює адміністратор, користувач далі лише входить.">
@@ -98,7 +98,7 @@ export function AdminSection() {
 
       <div className="mt-6">
         <Card title="Реєстр користувачів" subtitle="Список активних облікових записів у системі.">
-          <SimpleTable headers={['ПІБ', 'Email', 'Роль', 'Кімната', 'Баланс']} rows={(usersQuery.data ?? []).map((user) => [user.fullName, user.email, roleTitle[user.role], roomNumberForUser(user, roomsQuery.data ?? []), formatMoney(user.balance)])} />
+          <SimpleTable headers={['ПІБ', 'Email', 'Роль', 'Кімната', 'Заборгованість']} rows={(usersQuery.data ?? []).map((user) => [user.fullName, user.email, roleTitle[user.role], roomNumberForUser(user, roomsQuery.data ?? []), formatMoney(user.debtAmount ?? 0)])} />
         </Card>
       </div>
     </SectionFrame>

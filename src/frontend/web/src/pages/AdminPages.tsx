@@ -1,7 +1,15 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { BookText, PencilLine, Plus, Settings2, ShieldCheck, UserPlus } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import {
+  BookText,
+  PencilLine,
+  Plus,
+  Settings2,
+  ShieldCheck,
+  Trash2,
+  UserPlus,
+} from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod'
 import {
@@ -21,6 +29,8 @@ import {
   createTariff,
   createTicketCategory,
   createUser,
+  deleteTariff,
+  deleteUser,
   getRoles,
   getRooms,
   getTariffs,
@@ -30,7 +40,7 @@ import {
 } from '../lib/api'
 import { formatMoney } from '../lib/format'
 import { getRoleDescription, getRoleTitle } from '../lib/roles'
-import type { Tariff } from '../lib/types'
+import type { DormUser, Tariff, UserRole } from '../lib/types'
 
 const userSchema = z.object({
   fullName: z.string().min(3, 'Вкажіть ПІБ'),
@@ -59,25 +69,51 @@ type CategoryFormValues = z.output<typeof categorySchema>
 type TariffFormInput = z.input<typeof tariffSchema>
 type TariffFormValues = z.output<typeof tariffSchema>
 type DirectoryTab = 'roles' | 'categories' | 'tariffs'
+type UserCatalogMode = 'students' | 'staff'
 
-export function AdminUsersPage() {
+export function AdminStudentsPage() {
+  return <AdminUsersCatalogPage mode="students" />
+}
+
+export function AdminStaffPage() {
+  return <AdminUsersCatalogPage mode="staff" />
+}
+
+function AdminUsersCatalogPage({ mode }: { mode: UserCatalogMode }) {
   const queryClient = useQueryClient()
   const usersQuery = useQuery({ queryKey: ['users'], queryFn: getUsers })
   const rolesQuery = useQuery({ queryKey: ['roles'], queryFn: getRoles })
   const roomsQuery = useQuery({ queryKey: ['rooms'], queryFn: getRooms })
   const tariffsQuery = useQuery({ queryKey: ['tariffs'], queryFn: getTariffs })
   const [modalOpen, setModalOpen] = useState(false)
+  const [userToDelete, setUserToDelete] = useState<DormUser | null>(null)
+
+  const defaultRole: UserRole = mode === 'students' ? 'Student' : 'Commandant'
 
   const form = useForm<UserFormValues>({
     resolver: zodResolver(userSchema),
     defaultValues: {
-      role: 'Student',
+      role: defaultRole,
       roomId: '',
       tariffId: '',
     },
   })
 
   const selectedRole = useWatch({ control: form.control, name: 'role' })
+  const isStudentRole = selectedRole === 'Student'
+
+  useEffect(() => {
+    if (!isStudentRole) {
+      form.setValue('roomId', '')
+      form.setValue('tariffId', '')
+    }
+  }, [form, isStudentRole])
+
+  const users = usersQuery.data ?? []
+  const rooms = roomsQuery.data ?? []
+  const filteredUsers = users.filter((user) =>
+    mode === 'students' ? user.role === 'Student' : user.role !== 'Student',
+  )
 
   const createUserMutation = useMutation({
     mutationFn: (values: UserFormValues) =>
@@ -86,23 +122,45 @@ export function AdminUsersPage() {
         email: values.email,
         phone: values.phone,
         role: values.role,
-        roomId: values.roomId || null,
+        roomId: values.role === 'Student' ? values.roomId || null : null,
         tariffId: values.role === 'Student' ? values.tariffId || null : null,
       }),
     onSuccess: async () => {
-      form.reset({ role: 'Student', roomId: '', tariffId: '' })
+      form.reset({ role: defaultRole, roomId: '', tariffId: '' })
       setModalOpen(false)
       await queryClient.invalidateQueries({ queryKey: ['users'] })
+      await queryClient.invalidateQueries({ queryKey: ['rooms'] })
     },
   })
 
+  const deleteUserMutation = useMutation({
+    mutationFn: (userId: string) => deleteUser(userId),
+    onSuccess: async () => {
+      setUserToDelete(null)
+      await queryClient.invalidateQueries({ queryKey: ['users'] })
+      await queryClient.invalidateQueries({ queryKey: ['rooms'] })
+    },
+  })
+
+  const roomNumberById = (roomId: string | null) =>
+    rooms.find((room) => room.id === roomId)?.roomNumber ?? '—'
+
   return (
     <PageSection
-      eyebrow="Administration"
-      title="Користувачі та доступ"
-      description="Операційний реєстр акаунтів із ролями, кімнатами, балансом і стартовим тарифом для мешканців."
+      eyebrow="Адміністрування"
+      title={mode === 'students' ? 'Студенти' : 'Персонал'}
+      description={
+        mode === 'students'
+          ? 'Список мешканців із кімнатами, контактами та поточним станом оплати.'
+          : 'Команда гуртожитку, ролі та доступи до потрібних розділів.'
+      }
       actions={
-        <PrimaryButton onClick={() => setModalOpen(true)}>
+        <PrimaryButton
+          onClick={() => {
+            form.reset({ role: defaultRole, roomId: '', tariffId: '' })
+            setModalOpen(true)
+          }}
+        >
           <UserPlus className="mr-2 h-4 w-4" />
           Створити акаунт
         </PrimaryButton>
@@ -110,35 +168,68 @@ export function AdminUsersPage() {
     >
       <div className="grid gap-5 lg:grid-cols-3">
         <SurfaceCard>
-          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Усього профілів</p>
-          <p className="mt-3 font-display text-4xl text-slate-950">{usersQuery.data?.length ?? 0}</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
+            Усього профілів
+          </p>
+          <p className="mt-3 font-display text-4xl text-slate-950">{filteredUsers.length}</p>
         </SurfaceCard>
         <SurfaceCard>
-          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Активні акаунти</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
+            Активні акаунти
+          </p>
           <p className="mt-3 font-display text-4xl text-slate-950">
-            {usersQuery.data?.filter((user) => user.isActive).length ?? 0}
+            {filteredUsers.filter((user) => user.isActive).length}
           </p>
         </SurfaceCard>
         <SurfaceCard>
-          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Ролей у системі</p>
-          <p className="mt-3 font-display text-4xl text-slate-950">{rolesQuery.data?.length ?? 0}</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
+            {mode === 'students' ? 'З кімнатою' : 'Ролей у списку'}
+          </p>
+          <p className="mt-3 font-display text-4xl text-slate-950">
+            {mode === 'students'
+              ? filteredUsers.filter((user) => user.roomId).length
+              : new Set(filteredUsers.map((user) => user.role)).size}
+          </p>
         </SurfaceCard>
       </div>
 
       <SurfaceCard>
         <DataTable
-          headers={['ПІБ', 'Email', 'Телефон', 'Роль', 'Кімната', 'Баланс', 'Стан']}
-          rows={(usersQuery.data ?? []).map((user) => [
-            user.fullName,
-            user.email,
-            user.phone,
-            <Badge tone="sky">{getRoleTitle(user.role)}</Badge>,
-            user.roomId ?? '—',
-            formatMoney(user.balance),
-            <Badge tone={user.isActive ? 'emerald' : 'slate'}>
-              {user.isActive ? 'Активний' : 'Неактивний'}
-            </Badge>,
-          ])}
+          headers={
+            mode === 'students'
+              ? ['ПІБ', 'Email', 'Телефон', 'Кімната', 'До сплати', 'Стан', 'Дії']
+              : ['ПІБ', 'Email', 'Телефон', 'Роль', 'Стан', 'Дії']
+          }
+          rows={filteredUsers.map((user) =>
+            mode === 'students'
+              ? [
+                  user.fullName,
+                  user.email,
+                  user.phone,
+                  roomNumberById(user.roomId),
+                  formatMoney(user.debtAmount ?? 0),
+                  <Badge tone={user.isActive ? 'emerald' : 'slate'}>
+                    {user.isActive ? 'Активний' : 'Неактивний'}
+                  </Badge>,
+                  <SecondaryButton onClick={() => setUserToDelete(user)}>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Видалити
+                  </SecondaryButton>,
+                ]
+              : [
+                  user.fullName,
+                  user.email,
+                  user.phone,
+                  <Badge tone="sky">{getRoleTitle(user.role)}</Badge>,
+                  <Badge tone={user.isActive ? 'emerald' : 'slate'}>
+                    {user.isActive ? 'Активний' : 'Неактивний'}
+                  </Badge>,
+                  <SecondaryButton onClick={() => setUserToDelete(user)}>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Видалити
+                  </SecondaryButton>,
+                ],
+          )}
         />
       </SurfaceCard>
 
@@ -160,39 +251,47 @@ export function AdminUsersPage() {
             </TextField>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <TextField label="Роль">
-              <Select {...form.register('role')}>
-                {(rolesQuery.data ?? []).map((role) => (
+          <TextField label="Роль">
+            <Select {...form.register('role')}>
+              {(rolesQuery.data ?? [])
+                .filter((role) => (mode === 'students' ? role.name === 'Student' : role.name !== 'Student'))
+                .map((role) => (
                   <option key={role.id} value={role.name}>
                     {getRoleTitle(role.name)}
                   </option>
                 ))}
-              </Select>
-            </TextField>
-            <TextField label="Кімната" hint="Опціонально">
-              <Select {...form.register('roomId')}>
-                <option value="">Без прив'язки</option>
-                {(roomsQuery.data ?? []).map((room) => (
-                  <option key={room.id} value={room.id}>
-                    Кімната {room.roomNumber}
-                  </option>
-                ))}
-              </Select>
-            </TextField>
-          </div>
+            </Select>
+          </TextField>
 
-          {selectedRole === 'Student' ? (
-            <TextField label="Тариф" hint="Можна призначити одразу під час створення студента">
-              <Select {...form.register('tariffId')}>
-                <option value="">Автоматично за кімнатою або без тарифу</option>
-                {(tariffsQuery.data ?? []).map((tariff) => (
-                  <option key={tariff.id} value={tariff.id}>
-                    {tariff.name} · {formatMoney(tariff.monthlyRate)}
-                  </option>
-                ))}
-              </Select>
-            </TextField>
+          {isStudentRole ? (
+            <>
+              <TextField label="Кімната" hint="Опціонально">
+                <Select {...form.register('roomId')}>
+                  <option value="">Без прив’язки</option>
+                  {rooms.map((room) => {
+                    const isUnavailable = room.isUnderRepair || room.occupied >= room.capacity
+
+                    return (
+                      <option key={room.id} value={room.id} disabled={isUnavailable}>
+                        Кімната {room.roomNumber} · {room.occupied}/{room.capacity}
+                        {room.isUnderRepair ? ' · ремонт' : room.occupied >= room.capacity ? ' · заповнено' : ''}
+                      </option>
+                    )
+                  })}
+                </Select>
+              </TextField>
+
+              <TextField label="Тариф" hint="Опціонально">
+                <Select {...form.register('tariffId')}>
+                  <option value="">Автоматично за кімнатою або без тарифу</option>
+                  {(tariffsQuery.data ?? []).map((tariff) => (
+                    <option key={tariff.id} value={tariff.id}>
+                      {tariff.name} · {formatMoney(tariff.monthlyRate)}
+                    </option>
+                  ))}
+                </Select>
+              </TextField>
+            </>
           ) : null}
 
           <div className="rounded-[24px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
@@ -209,6 +308,30 @@ export function AdminUsersPage() {
           </div>
         </form>
       </Modal>
+
+      <Modal
+        open={Boolean(userToDelete)}
+        onClose={() => setUserToDelete(null)}
+        title="Видалення користувача"
+      >
+        {userToDelete ? (
+          <div className="grid gap-5">
+            <p className="text-sm leading-6 text-slate-600">
+              Користувача <span className="font-semibold text-slate-950">{userToDelete.fullName}</span> буде деактивовано.
+              Акаунт зникне з активних списків і не зможе увійти до системи.
+            </p>
+            <div className="flex justify-end gap-3">
+              <SecondaryButton onClick={() => setUserToDelete(null)}>Скасувати</SecondaryButton>
+              <PrimaryButton
+                onClick={() => deleteUserMutation.mutate(userToDelete.id)}
+                disabled={deleteUserMutation.isPending}
+              >
+                {deleteUserMutation.isPending ? 'Видаляємо…' : 'Підтвердити'}
+              </PrimaryButton>
+            </div>
+          </div>
+        ) : null}
+      </Modal>
     </PageSection>
   )
 }
@@ -223,6 +346,7 @@ export function AdminDirectoriesPage() {
   const [categoryModalOpen, setCategoryModalOpen] = useState(false)
   const [tariffModalOpen, setTariffModalOpen] = useState(false)
   const [editingTariff, setEditingTariff] = useState<Tariff | null>(null)
+  const [tariffToDelete, setTariffToDelete] = useState<Tariff | null>(null)
 
   const categoryForm = useForm<CategoryFormInput, unknown, CategoryFormValues>({
     resolver: zodResolver(categorySchema),
@@ -262,6 +386,14 @@ export function AdminDirectoriesPage() {
     },
   })
 
+  const deleteTariffMutation = useMutation({
+    mutationFn: (tariffId: string) => deleteTariff(tariffId),
+    onSuccess: async () => {
+      setTariffToDelete(null)
+      await queryClient.invalidateQueries({ queryKey: ['tariffs'] })
+    },
+  })
+
   const tabs = useMemo(
     () => [
       { id: 'roles' as const, label: 'Ролі', icon: ShieldCheck },
@@ -273,9 +405,9 @@ export function AdminDirectoriesPage() {
 
   return (
     <PageSection
-      eyebrow="Directories"
-      title="Довідники та системні параметри"
-      description="Єдиний контур для ролей, категорій поломок, тарифів і базових SLA."
+      eyebrow="Налаштування"
+      title="Списки та тарифи"
+      description="Тут зібрані ролі, категорії звернень і тарифи, які бачать користувачі системи."
     >
       <SurfaceCard>
         <div className="flex flex-wrap gap-2">
@@ -315,7 +447,7 @@ export function AdminDirectoriesPage() {
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Категорії</p>
-              <h2 className="text-2xl font-semibold text-slate-950">Типи ремонтних заявок</h2>
+              <h2 className="text-2xl font-semibold text-slate-950">Типи прохань про ремонт</h2>
             </div>
             <PrimaryButton onClick={() => setCategoryModalOpen(true)}>
               <Plus className="mr-2 h-4 w-4" />
@@ -349,7 +481,7 @@ export function AdminDirectoriesPage() {
                 <p className="mt-2 text-sm text-slate-600">
                   {tariff.floor ? `Поверх ${tariff.floor}` : 'Універсальний тариф'}
                 </p>
-                <div className="mt-5">
+                <div className="mt-5 flex flex-wrap gap-3">
                   <SecondaryButton
                     onClick={() => {
                       setEditingTariff(tariff)
@@ -364,6 +496,10 @@ export function AdminDirectoriesPage() {
                   >
                     <PencilLine className="mr-2 h-4 w-4" />
                     Редагувати
+                  </SecondaryButton>
+                  <SecondaryButton onClick={() => setTariffToDelete(tariff)}>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Видалити
                   </SecondaryButton>
                 </div>
               </SurfaceCard>
@@ -394,8 +530,8 @@ export function AdminDirectoriesPage() {
           </div>
         ) : (
           <EmptyState
-            title="Тарифи ще не налаштовані"
-            description="Створіть перший тарифний план для гуртожитку."
+            title="Тарифів поки немає"
+            description="Додайте перший тариф, щоб студентам було зрозуміло, за що вони платять."
             action={
               <PrimaryButton
                 onClick={() => {
@@ -471,6 +607,29 @@ export function AdminDirectoriesPage() {
             </PrimaryButton>
           </div>
         </form>
+      </Modal>
+
+      <Modal
+        open={Boolean(tariffToDelete)}
+        onClose={() => setTariffToDelete(null)}
+        title="Видалення тарифу"
+      >
+        {tariffToDelete ? (
+          <div className="grid gap-5">
+            <p className="text-sm leading-6 text-slate-600">
+              Тариф <span className="font-semibold text-slate-950">{tariffToDelete.name}</span> буде деактивовано й прибрано з активного списку.
+            </p>
+            <div className="flex justify-end gap-3">
+              <SecondaryButton onClick={() => setTariffToDelete(null)}>Скасувати</SecondaryButton>
+              <PrimaryButton
+                onClick={() => deleteTariffMutation.mutate(tariffToDelete.id)}
+                disabled={deleteTariffMutation.isPending}
+              >
+                {deleteTariffMutation.isPending ? 'Видаляємо…' : 'Підтвердити'}
+              </PrimaryButton>
+            </div>
+          </div>
+        ) : null}
       </Modal>
     </PageSection>
   )

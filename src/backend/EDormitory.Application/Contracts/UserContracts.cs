@@ -19,7 +19,7 @@ public sealed record UserResponse(
     string Phone,
     string Role,
     Guid? RoomId,
-    decimal Balance,
+    decimal? DebtAmount,
     bool MustChangePassword,
     bool IsActive);
 
@@ -31,7 +31,7 @@ public sealed record UserLookupResponse(
     string Role,
     Guid? RoomId,
     string? RoomNumber,
-    decimal Balance);
+    decimal? DebtAmount);
 
 public sealed class CreateUserRequestValidator : AbstractValidator<CreateUserRequest>
 {
@@ -58,5 +58,6 @@ public interface IUserService
     Task<IReadOnlyCollection<UserResponse>> GetUsersAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyCollection<UserLookupResponse>> SearchUsersAsync(string? role, string? query, CancellationToken cancellationToken = default);
     Task<UserResponse> CreateUserAsync(CreateUserRequest request, CancellationToken cancellationToken = default);
+    Task DeleteUserAsync(Guid userId, CancellationToken cancellationToken = default);
     Task ResetPasswordAsync(ResetPasswordRequest request, CancellationToken cancellationToken = default);
 }

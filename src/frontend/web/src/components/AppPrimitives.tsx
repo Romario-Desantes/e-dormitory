@@ -275,7 +275,7 @@ export function DataTable({
       <div className="grid gap-3 p-3 md:hidden">
         {rows.length === 0 ? (
           <div className="rounded-[22px] border border-dashed border-slate-200 px-4 py-8 text-center text-slate-500">
-            РџРѕРєРё С‰Рѕ РЅРµРјР°С” РґР°РЅРёС….
+            Тут поки порожньо. Коли щось з’явиться, ми покажемо це тут.
           </div>
         ) : (
           rows.map((row, rowIndex) => (
@@ -313,7 +313,7 @@ export function DataTable({
             {rows.length === 0 ? (
               <tr>
                 <td colSpan={headers.length} className="px-4 py-8 text-center text-slate-500">
-                  Поки що немає даних.
+                  Тут поки порожньо. Коли щось з’явиться, ми покажемо це тут.
                 </td>
               </tr>
             ) : (
@@ -398,7 +398,7 @@ export function Modal({
       >
         <div className="mb-5 flex items-center justify-between gap-4">
           <h2 className="font-display text-2xl text-slate-950">{title}</h2>
-          <SecondaryButton onClick={onClose}>Закрити</SecondaryButton>
+          <SecondaryButton onClick={onClose}>Повернутися</SecondaryButton>
         </div>
         {children}
       </div>
@@ -434,7 +434,7 @@ export function Drawer({
       >
         <div className="mb-6 flex items-center justify-between gap-4">
           <h2 className="font-display text-2xl text-slate-950">{title}</h2>
-          <SecondaryButton onClick={onClose}>Закрити</SecondaryButton>
+          <SecondaryButton onClick={onClose}>Повернутися</SecondaryButton>
         </div>
         {children}
       </aside>

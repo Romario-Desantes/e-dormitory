@@ -32,7 +32,7 @@ public sealed class AuthService(
         if (user is null || !passwordHasher.Verify(request.Password, user.PasswordHash))
         {
             await auditService.LogSecurityEventAsync(null, "auth.login.failed", normalizedEmail, ipAddress, userAgent, cancellationToken);
-            throw new ForbiddenException("Неправильний email або пароль.");
+            throw new ForbiddenException("РќРµРїСЂР°РІРёР»СЊРЅРёР№ email Р°Р±Рѕ РїР°СЂРѕР»СЊ.");
         }
 
         var now = clock.UtcNow;
@@ -75,12 +75,12 @@ public sealed class AuthService(
         if (token is null || !token.IsUsable(clock.UtcNow) || token.Session.IsExpired(clock.UtcNow, TimeSpan.FromMinutes(_options.SessionIdleMinutes)))
         {
             await auditService.LogSecurityEventAsync(null, "auth.refresh.failed", "invalid token", ipAddress, userAgent, cancellationToken);
-            throw new ForbiddenException("Сесію завершено. Увійдіть повторно.");
+            throw new ForbiddenException("РЎРµСЃС–СЋ Р·Р°РІРµСЂС€РµРЅРѕ. РЈРІС–Р№РґС–С‚СЊ РїРѕРІС‚РѕСЂРЅРѕ.");
         }
 
         if (!string.Equals(token.Session.CsrfToken, csrfToken, StringComparison.Ordinal))
         {
-            throw new ForbiddenException("Недійсний CSRF токен.");
+            throw new ForbiddenException("РќРµРґС–Р№СЃРЅРёР№ CSRF С‚РѕРєРµРЅ.");
         }
 
         token.RevokedAt = clock.UtcNow;
@@ -152,23 +152,31 @@ public sealed class AuthService(
     {
         if (!currentUser.UserId.HasValue)
         {
-            throw new ForbiddenException("Користувач не авторизований.");
+            throw new ForbiddenException("РљРѕСЂРёСЃС‚СѓРІР°С‡ РЅРµ Р°РІС‚РѕСЂРёР·РѕРІР°РЅРёР№.");
         }
 
         var user = await dbContext.Users.Include(x => x.Role).FirstOrDefaultAsync(x => x.Id == currentUser.UserId.Value, cancellationToken)
-            ?? throw new NotFoundException("Користувача не знайдено.");
+            ?? throw new NotFoundException("РљРѕСЂРёСЃС‚СѓРІР°С‡Р° РЅРµ Р·РЅР°Р№РґРµРЅРѕ.");
 
-        var balance = await GetOutstandingBalanceAsync(user.Id, user.Balance, cancellationToken);
-        return user.ToAuthenticatedUser(balance);
+        var debtAmount = await GetDebtAmountAsync(user, cancellationToken);
+        return user.ToAuthenticatedUser(debtAmount);
     }
 
-    private async Task<decimal> GetOutstandingBalanceAsync(Guid userId, decimal fallbackBalance, CancellationToken cancellationToken)
+    private async Task<decimal?> GetDebtAmountAsync(User user, CancellationToken cancellationToken)
     {
-        var outstanding = await dbContext.StudentCharges
-            .Where(charge => charge.UserId == userId)
-            .SumAsync(charge => (decimal?)(charge.Amount - charge.PaidAmount), cancellationToken);
+        if (user.Role.Name != UserRole.Student)
+        {
+            return null;
+        }
 
-        return Math.Max(0m, outstanding ?? fallbackBalance);
+        var balances = await dbContext.StudentCharges
+            .Where(charge => charge.UserId == user.Id)
+            .Select(charge => charge.Amount - charge.PaidAmount)
+            .ToListAsync(cancellationToken);
+
+        var outstanding = balances.Count == 0 ? (decimal?)null : balances.Sum();
+
+        return Math.Max(0m, outstanding ?? user.Balance);
     }
 }
 
@@ -188,8 +196,8 @@ public sealed class UserService(
             .OrderBy(x => x.FullName)
             .ToListAsync(cancellationToken);
 
-        var balances = await GetOutstandingBalancesAsync(users.Select(x => x.Id), cancellationToken);
-        return users.Select(x => x.ToResponse(GetEffectiveBalance(x.Id, x.Balance, balances))).ToList();
+        var debtAmounts = await GetOutstandingBalancesAsync(users.Select(x => x.Id), cancellationToken);
+        return users.Select(user => user.ToResponse(GetEffectiveDebtAmount(user, debtAmounts))).ToList();
     }
 
     public async Task<IReadOnlyCollection<UserLookupResponse>> SearchUsersAsync(string? role, string? query, CancellationToken cancellationToken = default)
@@ -220,8 +228,8 @@ public sealed class UserService(
             .Take(20)
             .ToListAsync(cancellationToken);
 
-        var balances = await GetOutstandingBalancesAsync(users.Select(x => x.Id), cancellationToken);
-        return users.Select(x => x.ToLookup(GetEffectiveBalance(x.Id, x.Balance, balances))).ToList();
+        var debtAmounts = await GetOutstandingBalancesAsync(users.Select(x => x.Id), cancellationToken);
+        return users.Select(user => user.ToLookup(GetEffectiveDebtAmount(user, debtAmounts))).ToList();
     }
 
     public async Task<UserResponse> CreateUserAsync(CreateUserRequest request, CancellationToken cancellationToken = default)
@@ -231,7 +239,7 @@ public sealed class UserService(
         var normalizedEmail = request.Email.Trim().ToLowerInvariant();
         if (await dbContext.Users.AnyAsync(x => x.Email == normalizedEmail, cancellationToken))
         {
-            throw new ConflictException("Користувач з таким email уже існує.");
+            throw new ConflictException("РљРѕСЂРёСЃС‚СѓРІР°С‡ Р· С‚Р°РєРёРј email СѓР¶Рµ С–СЃРЅСѓС”.");
         }
 
         var roleValue = Enum.Parse<UserRole>(request.Role, true);
@@ -239,16 +247,25 @@ public sealed class UserService(
         Room? room = null;
         TariffPlan? tariff = null;
 
+        if (roleValue != UserRole.Student && (request.RoomId.HasValue || request.TariffId.HasValue))
+        {
+            throw new ConflictException("Кімнату та тариф можна призначати лише студентам.");
+        }
+
         if (roleValue == UserRole.Student && request.RoomId.HasValue)
         {
-            room = await dbContext.Rooms.FirstOrDefaultAsync(x => x.Id == request.RoomId.Value, cancellationToken)
-                ?? throw new NotFoundException("Кімнату не знайдено.");
+            room = await dbContext.Rooms
+                .Include(x => x.Residents.Where(resident => resident.IsActive))
+                .FirstOrDefaultAsync(x => x.Id == request.RoomId.Value, cancellationToken)
+                ?? throw new NotFoundException("РљС–РјРЅР°С‚Сѓ РЅРµ Р·РЅР°Р№РґРµРЅРѕ.");
+
+            EnsureRoomCanHostStudent(room);
         }
 
         if (roleValue == UserRole.Student && request.TariffId.HasValue)
         {
             tariff = await dbContext.Tariffs.FirstOrDefaultAsync(x => x.Id == request.TariffId.Value, cancellationToken)
-                ?? throw new NotFoundException("Тариф не знайдено.");
+                ?? throw new NotFoundException("РўР°СЂРёС„ РЅРµ Р·РЅР°Р№РґРµРЅРѕ.");
         }
 
         var initialChargeAmount = tariff?.MonthlyRate ?? room?.MonthlyRate ?? 0m;
@@ -274,7 +291,7 @@ public sealed class UserService(
             dbContext.StudentCharges.Add(new StudentCharge
             {
                 UserId = user.Id,
-                Title = $"Проживання за {DateTimeOffset.UtcNow:MMMM yyyy}",
+                Title = $"РџСЂРѕР¶РёРІР°РЅРЅСЏ Р·Р° {DateTimeOffset.UtcNow:MMMM yyyy}",
                 Amount = initialChargeAmount,
                 Currency = "UAH",
                 DueDate = DateTimeOffset.UtcNow.AddDays(7),
@@ -286,7 +303,61 @@ public sealed class UserService(
 
         user.Role = role;
         await auditService.LogAsync(nameof(User), user.Id, "user.created", currentUser.UserId, new { user.Email, Role = role.Name }, cancellationToken);
-        return user.ToResponse(user.Balance);
+        return user.ToResponse(roleValue == UserRole.Student ? initialChargeAmount : null);
+    }
+
+    public async Task DeleteUserAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        EnsureRole(UserRole.Admin);
+
+        if (currentUser.UserId == userId)
+        {
+            throw new ConflictException("Неможливо видалити власний обліковий запис.");
+        }
+
+        var user = await dbContext.Users
+            .Include(x => x.Role)
+            .FirstOrDefaultAsync(x => x.Id == userId, cancellationToken)
+            ?? throw new NotFoundException("РљРѕСЂРёСЃС‚СѓРІР°С‡Р° РЅРµ Р·РЅР°Р№РґРµРЅРѕ.");
+
+        var activeCharges = await dbContext.StudentCharges
+            .IgnoreQueryFilters()
+            .Where(x => x.IsActive && x.UserId == userId)
+            .ToListAsync(cancellationToken);
+
+        foreach (var charge in activeCharges)
+        {
+            charge.SoftDelete(currentUser.UserId);
+        }
+
+        user.Balance = 0m;
+        user.SoftDelete(currentUser.UserId);
+        user.IncreaseTokenVersion(currentUser.UserId);
+
+        var sessions = await dbContext.UserSessions
+            .IgnoreQueryFilters()
+            .Where(x => x.UserId == userId && x.IsActive)
+            .ToListAsync(cancellationToken);
+
+        foreach (var session in sessions)
+        {
+            session.IsRevoked = true;
+            session.Touch(currentUser.UserId);
+        }
+
+        var refreshTokens = await dbContext.RefreshTokens
+            .IgnoreQueryFilters()
+            .Where(x => x.IsActive && x.Session.UserId == userId)
+            .ToListAsync(cancellationToken);
+
+        foreach (var token in refreshTokens)
+        {
+            token.RevokedAt ??= DateTimeOffset.UtcNow;
+            token.Touch(currentUser.UserId);
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await auditService.LogAsync(nameof(User), user.Id, "user.deleted", currentUser.UserId, new { user.Email }, cancellationToken);
     }
 
     public async Task ResetPasswordAsync(ResetPasswordRequest request, CancellationToken cancellationToken = default)
@@ -294,7 +365,7 @@ public sealed class UserService(
         EnsureRole(UserRole.Admin);
 
         var user = await dbContext.Users.FirstOrDefaultAsync(x => x.Id == request.UserId, cancellationToken)
-            ?? throw new NotFoundException("Користувача не знайдено.");
+            ?? throw new NotFoundException("РљРѕСЂРёСЃС‚СѓРІР°С‡Р° РЅРµ Р·РЅР°Р№РґРµРЅРѕ.");
 
         user.PasswordHash = passwordHasher.Hash(request.NewPassword);
         user.MustChangePassword = false;
@@ -307,7 +378,7 @@ public sealed class UserService(
     {
         if (!currentUser.Role.HasValue || !roles.Contains(currentUser.Role.Value))
         {
-            throw new ForbiddenException("Недостатньо прав для цієї дії.");
+            throw new ForbiddenException("РќРµРґРѕСЃС‚Р°С‚РЅСЊРѕ РїСЂР°РІ РґР»СЏ С†С–С”С— РґС–С—.");
         }
     }
 
@@ -319,31 +390,57 @@ public sealed class UserService(
             return [];
         }
 
-        return await dbContext.StudentCharges
+        var balances = await dbContext.StudentCharges
             .Where(charge => ids.Contains(charge.UserId))
-            .GroupBy(charge => charge.UserId)
-            .Select(group => new
+            .Select(charge => new
             {
-                UserId = group.Key,
-                Balance = group.Sum(charge => charge.Amount - charge.PaidAmount),
+                charge.UserId,
+                Outstanding = charge.Amount - charge.PaidAmount,
             })
-            .ToDictionaryAsync(item => item.UserId, item => Math.Max(0m, item.Balance), cancellationToken);
+            .ToListAsync(cancellationToken);
+
+        return balances
+            .GroupBy(charge => charge.UserId)
+            .ToDictionary(
+                group => group.Key,
+                group => Math.Max(0m, group.Sum(charge => charge.Outstanding)));
     }
 
-    private static decimal GetEffectiveBalance(Guid userId, decimal fallbackBalance, IReadOnlyDictionary<Guid, decimal> balances) =>
-        balances.TryGetValue(userId, out var balance) ? balance : fallbackBalance;
+    private static decimal? GetEffectiveDebtAmount(User user, IReadOnlyDictionary<Guid, decimal> debtAmounts)
+    {
+        if (user.Role.Name != UserRole.Student)
+        {
+            return null;
+        }
+
+        return debtAmounts.TryGetValue(user.Id, out var debtAmount) ? debtAmount : user.Balance;
+    }
+
+    private static void EnsureRoomCanHostStudent(Room room)
+    {
+        if (room.IsUnderRepair)
+        {
+            throw new ConflictException("Не можна заселити студента в кімнату, що перебуває в ремонті.");
+        }
+
+        var occupied = room.Residents.Count(resident => resident.IsActive);
+        if (occupied >= room.Capacity)
+        {
+            throw new ConflictException("У вибраній кімнаті вже немає вільних місць.");
+        }
+    }
 }
 
 internal static partial class MappingExtensions
 {
-    public static AuthenticatedUserResponse ToAuthenticatedUser(this User user, decimal? balance = null) =>
-        new(user.Id, user.FullName, user.Email, user.Phone, user.Role.Name.ToString(), user.RoomId, user.MustChangePassword, balance ?? user.Balance);
+    public static AuthenticatedUserResponse ToAuthenticatedUser(this User user, decimal? debtAmount = null) =>
+        new(user.Id, user.FullName, user.Email, user.Phone, user.Role.Name.ToString(), user.RoomId, user.MustChangePassword, debtAmount);
 
-    public static UserResponse ToResponse(this User user, decimal? balance = null) =>
-        new(user.Id, user.FullName, user.Email, user.Phone, user.Role.Name.ToString(), user.RoomId, balance ?? user.Balance, user.MustChangePassword, user.IsActive);
+    public static UserResponse ToResponse(this User user, decimal? debtAmount = null) =>
+        new(user.Id, user.FullName, user.Email, user.Phone, user.Role.Name.ToString(), user.RoomId, debtAmount, user.MustChangePassword, user.IsActive);
 
-    public static UserLookupResponse ToLookup(this User user, decimal? balance = null) =>
-        new(user.Id, user.FullName, user.Email, user.Phone, user.Role.Name.ToString(), user.RoomId, user.Room?.RoomNumber, balance ?? user.Balance);
+    public static UserLookupResponse ToLookup(this User user, decimal? debtAmount = null) =>
+        new(user.Id, user.FullName, user.Email, user.Phone, user.Role.Name.ToString(), user.RoomId, user.Room?.RoomNumber, debtAmount);
 
     public static AuthSessionResult BuildSessionResult(this User user, UserSession session, string refreshToken, ITokenService tokenService, JwtOptions options, DateTimeOffset now)
     {

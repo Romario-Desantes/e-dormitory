@@ -22,9 +22,9 @@ import { useCurrentUser } from '../../components/AppShellContext'
 import { passLabel } from './studentLabels'
 
 const passSchema = z.object({
-  guestFullName: z.string().min(3),
-  guestDocument: z.string().min(4),
-  visitDate: z.string().min(1),
+  guestFullName: z.string().min(3, 'Напишіть ім’я гостя повністю.'),
+  guestDocument: z.string().min(4, 'Додайте документ, який гість покаже на вході.'),
+  visitDate: z.string().min(1, 'Оберіть дату візиту.'),
 })
 
 type PassFormValues = z.infer<typeof passSchema>
@@ -95,21 +95,21 @@ export function StudentPassesPage() {
     }
 
     await navigator.clipboard.writeText(text)
-    setShareMessage('Дані перепустки скопійовано')
+    setShareMessage('Готово! Дані перепустки скопійовано.')
   }
 
   return (
     <PageSection
       eyebrow="Гості"
-      title="Гостьові перепустки"
-      description="Запросіть гостя і відразу отримайте квиток з QR-кодом, який можна зберегти або надіслати."
+      title="Запросити гостя"
+      description="Створіть QR-перепустку — гість покаже її на вході, а охорона швидко перевірить."
     >
       {shareMessage ? <div className="rounded-[24px] border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-700">{shareMessage}</div> : null}
 
       <div className="grid gap-5 lg:grid-cols-[0.78fr_1.22fr]">
         <SurfaceCard>
-          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Запросити гостя</p>
-          <h2 className="mt-3 font-display text-2xl text-slate-950 sm:text-3xl">Нова перепустка</h2>
+          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Новий гість</p>
+          <h2 className="mt-3 font-display text-2xl text-slate-950 sm:text-3xl">Кого чекаємо?</h2>
           <form className="mt-6 grid gap-4" onSubmit={form.handleSubmit((values) => createPassMutation.mutate(values))}>
             <TextField label="Ім’я гостя">
               <Input placeholder="Наприклад, Марія Ковальчук" {...form.register('guestFullName')} />
@@ -122,7 +122,7 @@ export function StudentPassesPage() {
             </TextField>
             <PrimaryButton type="submit" disabled={createPassMutation.isPending}>
               <QrCode className="mr-2 h-4 w-4" />
-              {createPassMutation.isPending ? 'Створюємо…' : 'Створити перепустку'}
+              {createPassMutation.isPending ? 'Створюємо…' : 'Створити QR-перепустку'}
             </PrimaryButton>
           </form>
         </SurfaceCard>
@@ -168,7 +168,7 @@ export function StudentPassesPage() {
               </SurfaceCard>
             ))
           ) : (
-            <EmptyState title="Перепусток ще немає" description="Після створення перепустка одразу з’явиться тут як готовий віртуальний квиток." />
+            <EmptyState title="Гостей поки немає" description="Коли запросите когось, QR-перепустка одразу з’явиться тут." />
           )}
         </div>
       </div>

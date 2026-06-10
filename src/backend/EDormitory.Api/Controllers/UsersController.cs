@@ -25,6 +25,14 @@ public sealed class UsersController(IUserService userService) : ControllerBase
     public async Task<ActionResult<UserResponse>> CreateUser([FromBody] CreateUserRequest request, CancellationToken cancellationToken) =>
         Ok(await userService.CreateUserAsync(request, cancellationToken));
 
+    [HttpDelete("{id:guid}")]
+    [Authorize(Policy = Policies.ManageUsers)]
+    public async Task<IActionResult> DeleteUser(Guid id, CancellationToken cancellationToken)
+    {
+        await userService.DeleteUserAsync(id, cancellationToken);
+        return NoContent();
+    }
+
     [HttpPost("{id:guid}/reset-password")]
     [Authorize(Policy = Policies.ManageUsers)]
     public async Task<IActionResult> ResetPassword(Guid id, [FromBody] ResetPasswordRequest request, CancellationToken cancellationToken)

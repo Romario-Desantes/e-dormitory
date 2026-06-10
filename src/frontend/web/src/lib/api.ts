@@ -5,7 +5,7 @@ import type {
   Charge,
   DormUser,
   GuestPass,
-  NotificationItem,
+  NotificationFeed,
   PassLog,
   Payment,
   RelocationRequest,
@@ -86,7 +86,10 @@ function parseAuthenticatedUser(payload: unknown): AuthenticatedUser {
     role,
     roomId: typeof candidate.roomId === 'string' ? candidate.roomId : null,
     mustChangePassword: Boolean(candidate.mustChangePassword),
-    balance: Number(candidate.balance ?? 0),
+    debtAmount:
+      candidate.debtAmount === null || candidate.debtAmount === undefined
+        ? null
+        : Number(candidate.debtAmount),
   }
 }
 
@@ -125,7 +128,11 @@ export async function getCurrentUser() {
 
 export async function getNotifications() {
   const response = await api.get('/notifications')
-  return response.data as NotificationItem[]
+  return response.data as NotificationFeed
+}
+
+export async function markNotificationsRead() {
+  await api.post('/notifications/read')
 }
 
 export async function getRooms() {
@@ -161,8 +168,10 @@ export async function reviewRelocation(id: string, payload: { decision: 'Approve
   return response.data as RelocationRequest
 }
 
-export async function getViolations() {
-  const response = await api.get('/rooms/violations')
+export async function getViolations(userId?: string) {
+  const response = await api.get('/rooms/violations', {
+    params: userId ? { userId } : undefined,
+  })
   return response.data as Violation[]
 }
 
@@ -210,6 +219,10 @@ export async function createTariff(payload: { name: string; monthlyRate: number;
 export async function updateTariff(id: string, payload: { name: string; monthlyRate: number; floor?: number | null; isDefault: boolean }) {
   const response = await api.patch(`/directories/tariffs/${id}`, payload)
   return response.data as Tariff
+}
+
+export async function deleteTariff(id: string) {
+  await api.delete(`/directories/tariffs/${id}`)
 }
 
 export async function getTickets() {
@@ -303,6 +316,10 @@ export async function getUsers() {
 export async function createUser(payload: CreateDormUserPayload) {
   const response = await api.post('/users', payload)
   return response.data as DormUser
+}
+
+export async function deleteUser(id: string) {
+  await api.delete(`/users/${id}`)
 }
 
 export async function uploadFile(file: File, ownerModule: string, ownerEntityId?: string | null) {

@@ -38,3 +38,10 @@ public sealed class RefreshToken : AuditableEntity
 
     public bool IsUsable(DateTimeOffset now) => IsActive && RevokedAt is null && ExpiresAt > now;
 }
+
+public sealed class NotificationState : AuditableEntity
+{
+    public Guid UserId { get; set; }
+    public User User { get; set; } = null!;
+    public DateTimeOffset? LastReadAt { get; set; }
+}

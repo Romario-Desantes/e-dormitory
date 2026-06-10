@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Building2, Plus, Search } from 'lucide-react'
+import { Building2, Plus, Search, ShieldAlert } from 'lucide-react'
 import { useDeferredValue, useEffect, useMemo, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod'
@@ -57,8 +57,8 @@ export function CommandantOccupancyPage() {
   return (
     <PageSection
       eyebrow="Кімнати"
-      title="Шахматка гуртожитку"
-      description="Натисніть на кімнату, щоб побачити мешканців, місткість і поточний тариф."
+      title="Кімнати гуртожитку"
+      description="Відкрийте кімнату, щоб побачити мешканців, вільні місця та тариф."
     >
       <SurfaceCard>
         <div className="flex flex-wrap items-center justify-between gap-4">
@@ -160,14 +160,15 @@ export function CommandantRelocationsPage() {
       reviewRelocation(id, { decision }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['relocations'] })
+      await queryClient.invalidateQueries({ queryKey: ['notifications'] })
     },
   })
 
   return (
     <PageSection
       eyebrow="Переселення"
-      title="Запити на переселення"
-      description="Погоджуйте або відхиляйте заявки на зміну кімнати прямо з таблиці."
+      title="Прохання про переселення"
+      description="Перегляньте причину студента й дайте зрозумілу відповідь щодо переїзду."
     >
       <SurfaceCard>
         <DataTable
@@ -207,14 +208,19 @@ export function CommandantRelocationsPage() {
 export function CommandantDisciplinePage() {
   const queryClient = useQueryClient()
   const [query, setQuery] = useState('')
+  const [selectedUserId, setSelectedUserId] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
   const deferredQuery = useDeferredValue(query)
 
-  const violationsQuery = useQuery({ queryKey: ['violations'], queryFn: getViolations })
+  const violationsQuery = useQuery({ queryKey: ['violations'], queryFn: () => getViolations() })
+  const selectedUserViolationsQuery = useQuery({
+    queryKey: ['violations', selectedUserId],
+    queryFn: () => getViolations(selectedUserId),
+    enabled: selectedUserId.length > 0,
+  })
   const usersQuery = useQuery({
     queryKey: ['user-search', deferredQuery.trim() || '__all__'],
     queryFn: () => searchUsers('Student', deferredQuery.trim()),
-    enabled: modalOpen,
   })
 
   const form = useForm<ViolationFormValues>({
@@ -229,11 +235,16 @@ export function CommandantDisciplinePage() {
     },
   })
 
-  const selectedUserId = useWatch({ control: form.control, name: 'userId' }) ?? ''
   const userOptions = useMemo(() => usersQuery.data ?? [], [usersQuery.data])
   const selectedUser = useMemo(
     () => userOptions.find((user) => user.id === selectedUserId) ?? null,
     [selectedUserId, userOptions],
+  )
+
+  const modalSelectedUserId = useWatch({ control: form.control, name: 'userId' }) ?? ''
+  const modalSelectedUser = useMemo(
+    () => userOptions.find((user) => user.id === modalSelectedUserId) ?? null,
+    [modalSelectedUserId, userOptions],
   )
 
   useEffect(() => {
@@ -241,16 +252,10 @@ export function CommandantDisciplinePage() {
       return
     }
 
-    const exactMatches = userOptions.filter(
-      (user) => user.fullName.toLowerCase() === query.trim().toLowerCase(),
-    )
-
-    if (exactMatches.length === 1) {
-      const match = exactMatches[0]
-      form.setValue('userId', match.id, { shouldDirty: true, shouldValidate: true })
-      form.setValue('roomId', match.roomId ?? '', { shouldDirty: true, shouldValidate: true })
+    if (modalSelectedUser) {
+      form.setValue('roomId', modalSelectedUser.roomId ?? '', { shouldValidate: true })
     }
-  }, [form, modalOpen, query, userOptions])
+  }, [form, modalOpen, modalSelectedUser])
 
   const createViolationMutation = useMutation({
     mutationFn: (values: ViolationFormValues) =>
@@ -270,32 +275,22 @@ export function CommandantDisciplinePage() {
         occurredAt: toInputDateTime(new Date()),
       })
       setModalOpen(false)
-      setQuery('')
       await queryClient.invalidateQueries({ queryKey: ['violations'] })
+      if (selectedUserId) {
+        await queryClient.invalidateQueries({ queryKey: ['violations', selectedUserId] })
+      }
+      await queryClient.invalidateQueries({ queryKey: ['notifications'] })
     },
   })
 
-  const handleUserSelect = (userId: string) => {
-    const selected = userOptions.find((item) => item.id === userId)
-    if (!selected) {
-      form.setValue('userId', '', { shouldDirty: true, shouldValidate: true })
-      form.setValue('roomId', '', { shouldDirty: true, shouldValidate: true })
-      return
-    }
-
-    form.setValue('userId', selected.id, { shouldDirty: true, shouldValidate: true })
-    form.setValue('roomId', selected.roomId ?? '', { shouldDirty: true, shouldValidate: true })
-    setQuery(selected.fullName)
-  }
-
   const canSave =
-    form.formState.isValid && Boolean(selectedUser) && !createViolationMutation.isPending
+    form.formState.isValid && Boolean(modalSelectedUser) && !createViolationMutation.isPending
 
   return (
     <PageSection
-      eyebrow="Порушення"
-      title="Журнал порушень"
-      description="Знайдіть студента, додайте запис і перегляньте останні випадки дисциплінарних порушень."
+      eyebrow="Зауваження"
+      title="Важливі ситуації"
+      description="Знайдіть студента, перегляньте історію й додайте коротке службове зауваження, якщо потрібно."
       actions={
         <PrimaryButton onClick={() => setModalOpen(true)}>
           <Plus className="mr-2 h-4 w-4" />
@@ -303,6 +298,119 @@ export function CommandantDisciplinePage() {
         </PrimaryButton>
       }
     >
+      <SurfaceCard>
+        <div className="grid gap-4 lg:grid-cols-[0.8fr_1.2fr]">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
+              Пошук студента
+            </p>
+            <div className="mt-3 rounded-[24px] border border-slate-200 bg-slate-50 p-2">
+              <Input
+                placeholder="ПІБ, email або номер кімнати"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+              />
+              <div className="mt-3 grid max-h-72 gap-2 overflow-y-auto pr-1">
+                {userOptions.map((user) => {
+                  const active = user.id === selectedUserId
+                  return (
+                    <button
+                      key={user.id}
+                      type="button"
+                      onClick={() => setSelectedUserId(user.id)}
+                      className={`rounded-[18px] border px-4 py-3 text-left transition ${
+                        active
+                          ? 'border-sky-300 bg-sky-50 shadow-sm'
+                          : 'border-white bg-white hover:border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      <p className="font-semibold text-slate-950">{user.fullName}</p>
+                      <p className="mt-1 text-sm text-slate-500">
+                        {user.roomNumber ? `Кімната ${user.roomNumber}` : 'Кімнату не вказано'}
+                      </p>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+
+          <SurfaceCard className="bg-slate-50">
+            {selectedUser ? (
+              <div className="grid gap-5">
+                <div className="flex items-start gap-3">
+                  <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-100 text-rose-700">
+                    <ShieldAlert className="h-6 w-6" />
+                  </span>
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
+                      Профіль студента
+                    </p>
+                    <h2 className="mt-2 text-2xl font-semibold text-slate-950">{selectedUser.fullName}</h2>
+                    <p className="mt-2 text-sm text-slate-600">
+                      {selectedUser.roomNumber ? `Кімната ${selectedUser.roomNumber}` : 'Кімнату не вказано'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="rounded-[22px] border border-slate-200 bg-white px-4 py-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                      Усього зауважень
+                    </p>
+                    <p className="mt-3 text-3xl font-semibold text-slate-950">
+                      {selectedUserViolationsQuery.data?.length ?? 0}
+                    </p>
+                  </div>
+                  <div className="rounded-[22px] border border-slate-200 bg-white px-4 py-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                      Останнє
+                    </p>
+                    <p className="mt-3 text-sm text-slate-700">
+                      {selectedUserViolationsQuery.data?.[0]
+                        ? formatDate(selectedUserViolationsQuery.data[0].occurredAt)
+                        : 'Ще немає записів'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid gap-3">
+                  {(selectedUserViolationsQuery.data ?? []).length > 0 ? (
+                    (selectedUserViolationsQuery.data ?? []).map((violation) => (
+                      <article key={violation.id} className="rounded-[22px] border border-slate-200 bg-white px-4 py-4">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <p className="font-semibold text-slate-950">{violation.description}</p>
+                          <Badge
+                            tone={
+                              violation.severity === 'High'
+                                ? 'rose'
+                                : violation.severity === 'Medium'
+                                  ? 'amber'
+                                  : 'sky'
+                            }
+                          >
+                            {violation.severity}
+                          </Badge>
+                        </div>
+                        <p className="mt-2 text-sm text-slate-500">{formatDate(violation.occurredAt)}</p>
+                      </article>
+                    ))
+                  ) : (
+                    <div className="rounded-[22px] border border-dashed border-slate-200 bg-white px-4 py-8 text-center text-slate-500">
+                      Для цього студента ще немає зауважень.
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-[22px] border border-dashed border-slate-200 bg-white px-4 py-12 text-center text-slate-500">
+                Оберіть студента ліворуч, щоб побачити історію зауважень.
+              </div>
+            )}
+          </SurfaceCard>
+        </div>
+      </SurfaceCard>
+
       <SurfaceCard>
         <DataTable
           headers={['Студент', 'Кімната', 'Рівень', 'Опис', 'Дата']}
@@ -336,77 +444,19 @@ export function CommandantDisciplinePage() {
           className="grid gap-4"
           onSubmit={form.handleSubmit((values) => createViolationMutation.mutate(values))}
         >
-          <TextField label="Знайти студента">
-            <Input
-              placeholder="ПІБ, email або номер кімнати"
-              value={query}
-              onChange={(event) => {
-                setQuery(event.target.value)
-                form.setValue('userId', '', { shouldDirty: true, shouldValidate: true })
-                form.setValue('roomId', '', { shouldDirty: true, shouldValidate: true })
-              }}
-            />
+          <TextField label="Студент">
+            <Select
+              value={modalSelectedUserId}
+              onChange={(event) => form.setValue('userId', event.target.value, { shouldValidate: true })}
+            >
+              <option value="">Оберіть студента</option>
+              {userOptions.map((user) => (
+                <option key={user.id} value={user.id}>
+                  {user.fullName} {user.roomNumber ? `· кімната ${user.roomNumber}` : ''}
+                </option>
+              ))}
+            </Select>
           </TextField>
-
-          <TextField
-            label="Список студентів"
-            hint="Список видно одразу. Ви можете прокрутити його або звузити пошук через поле вище."
-          >
-            <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-2">
-              {usersQuery.isLoading ? (
-                <div className="rounded-[18px] bg-white px-4 py-3 text-sm text-slate-500">
-                  Завантажуємо список студентів…
-                </div>
-              ) : userOptions.length > 0 ? (
-                <div className="grid max-h-56 gap-2 overflow-y-auto pr-1">
-                  {userOptions.map((user) => {
-                    const isSelected = user.id === selectedUserId
-
-                    return (
-                      <button
-                        key={user.id}
-                        type="button"
-                        onClick={() => handleUserSelect(user.id)}
-                        className={`rounded-[18px] border px-4 py-3 text-left transition ${
-                          isSelected
-                            ? 'border-sky-300 bg-sky-50 text-slate-950 shadow-sm'
-                            : 'border-white bg-white text-slate-700 hover:border-slate-200 hover:bg-slate-100'
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <p className="font-semibold">{user.fullName}</p>
-                            <p className="mt-1 text-sm text-slate-500">
-                              {user.roomNumber
-                                ? `Кімната ${user.roomNumber}`
-                                : 'Кімнату не вказано'}
-                            </p>
-                          </div>
-                          {isSelected ? <Badge tone="sky">Обрано</Badge> : null}
-                        </div>
-                      </button>
-                    )
-                  })}
-                </div>
-              ) : (
-                <div className="rounded-[18px] bg-white px-4 py-3 text-sm text-slate-500">
-                  Нічого не знайдено. Спробуйте інше ім’я, email або номер кімнати.
-                </div>
-              )}
-            </div>
-          </TextField>
-
-          {selectedUser ? (
-            <SurfaceCard className="rounded-[24px] bg-slate-50 p-4">
-              <p className="text-sm text-slate-500">Обраний студент</p>
-              <p className="mt-2 font-semibold text-slate-950">{selectedUser.fullName}</p>
-              <p className="mt-1 text-sm text-slate-600">
-                {selectedUser.roomNumber
-                  ? `Кімната ${selectedUser.roomNumber}`
-                  : 'Кімнату не вказано'}
-              </p>
-            </SurfaceCard>
-          ) : null}
 
           <div className="grid gap-4 md:grid-cols-2">
             <TextField label="Рівень">

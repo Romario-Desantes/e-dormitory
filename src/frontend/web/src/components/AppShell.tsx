@@ -1,6 +1,8 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { LucideIcon } from 'lucide-react'
 import {
   BadgeCheck,
+  Bell,
   BookOpen,
   ClipboardList,
   DoorOpen,
@@ -11,12 +13,14 @@ import {
   ScanLine,
   ShieldAlert,
   UserCog,
+  UserRoundCog,
   Users,
   Wrench,
 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { formatMoney } from '../lib/format'
+import { formatDate, formatMoney } from '../lib/format'
+import { getNotifications, markNotificationsRead } from '../lib/api'
 import { getNavigation, getRoleTitle } from '../lib/roles'
 import type { AuthenticatedUser, NavItem } from '../lib/types'
 import { PrimaryButton, SecondaryButton } from './AppPrimitives'
@@ -32,7 +36,8 @@ const iconMap: Record<string, LucideIcon> = {
   '/app/tasks': ClipboardList,
   '/app/guard': ScanLine,
   '/app/payments': Landmark,
-  '/app/users': Users,
+  '/app/students': Users,
+  '/app/staff': UserRoundCog,
   '/app/directories': BookOpen,
 }
 
@@ -44,34 +49,71 @@ export function AppShell({
   onLogout: () => void | Promise<void>
 }) {
   const location = useLocation()
+  const queryClient = useQueryClient()
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [notificationPanelOpen, setNotificationPanelOpen] = useState(false)
+  const notificationPanelRef = useRef<HTMLDivElement | null>(null)
   const navigation = getNavigation(currentUser.role)
+  const notificationsQuery = useQuery({
+    queryKey: ['notifications', currentUser.id],
+    queryFn: getNotifications,
+  })
+
+  const markReadMutation = useMutation({
+    mutationFn: markNotificationsRead,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['notifications', currentUser.id] })
+    },
+  })
 
   const activeNavItem = useMemo(() => {
     return navigation.find((item) => location.pathname.startsWith(item.to)) ?? navigation[0]
   }, [location.pathname, navigation])
 
+  useEffect(() => {
+    if (!notificationPanelOpen) {
+      return
+    }
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (notificationPanelRef.current && !notificationPanelRef.current.contains(event.target as Node)) {
+        setNotificationPanelOpen(false)
+      }
+    }
+
+    window.addEventListener('mousedown', handlePointerDown)
+    return () => window.removeEventListener('mousedown', handlePointerDown)
+  }, [notificationPanelOpen])
+
+  const unreadCount = notificationsQuery.data?.unreadCount ?? 0
+  const notificationItems = notificationsQuery.data?.items ?? []
+
+  const openNotifications = () => {
+    setNotificationPanelOpen((open) => {
+      const nextOpen = !open
+      if (!open && unreadCount > 0 && !markReadMutation.isPending) {
+        markReadMutation.mutate()
+      }
+      return nextOpen
+    })
+  }
+
   return (
     <div className="min-h-screen bg-[var(--color-page)] text-slate-950">
-      <div className="mx-auto flex min-h-screen max-w-[1800px] gap-0 lg:gap-4 lg:p-4">
-        <aside className="hidden w-[280px] shrink-0 lg:block xl:w-[312px]">
-          <div className="sticky top-4 flex h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-[36px] border border-white/60 bg-[linear-gradient(180deg,#14313c_0%,#0d1f2d_100%)] p-6 text-white shadow-[0_34px_90px_-40px_rgba(15,23,42,0.75)]">
+      <div className="mx-auto flex min-h-screen max-w-[1800px] gap-0 lg:gap-5 lg:p-4">
+        <aside className="hidden w-[176px] shrink-0 lg:block xl:w-[196px]">
+          <div className="sticky top-4 flex h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-[28px] border border-white/55 bg-[linear-gradient(180deg,#183342_0%,#5f7286_100%)] p-3 text-white shadow-[0_30px_80px_-42px_rgba(15,23,42,0.75)]">
             <BrandBlock />
             <NavPanel
               navigation={navigation}
               currentPath={location.pathname}
               onNavigate={() => undefined}
             />
-            <div className="mt-6 rounded-[28px] border border-white/10 bg-white/5 p-4">
-              <p className="text-xs uppercase tracking-[0.28em] text-white/55">Зараз відкрито</p>
-              <p className="mt-2 text-lg font-semibold">{activeNavItem?.label}</p>
-              <p className="mt-2 text-sm leading-6 text-white/72">{activeNavItem?.description}</p>
-            </div>
           </div>
         </aside>
 
         <div className="flex min-h-screen flex-1 flex-col">
-          <header className="sticky top-0 z-20 border-b border-white/60 bg-[rgba(247,246,242,0.84)] backdrop-blur lg:top-4 lg:rounded-[32px] lg:border lg:bg-[rgba(247,246,242,0.82)]">
+          <header className="relative z-10 border-b border-white/60 bg-[rgba(247,246,242,0.9)] backdrop-blur lg:rounded-[30px] lg:border lg:bg-[rgba(247,246,242,0.88)]">
             <div className="flex flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
               <div className="flex min-w-0 items-center gap-3">
                 <button
@@ -93,10 +135,55 @@ export function AppShell({
 
               <div className="flex w-full flex-col items-stretch gap-3 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
                 {currentUser.role === 'Student' ? (
-                  <div className="rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-center text-sm font-semibold text-emerald-800">
-                    Баланс: {formatMoney(currentUser.balance)}
+                  <div className="rounded-full border border-amber-200 bg-amber-50 px-4 py-2 text-center text-sm font-semibold text-amber-800">
+                    До сплати: {formatMoney(currentUser.debtAmount ?? 0)}
                   </div>
                 ) : null}
+
+                <div className="relative" ref={notificationPanelRef}>
+                  <button
+                    type="button"
+                    onClick={openNotifications}
+                    className="relative inline-flex h-12 w-12 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
+                    aria-label="Повідомлення"
+                  >
+                    <Bell className="h-5 w-5" />
+                    {unreadCount > 0 ? (
+                      <span className="absolute bottom-2 right-2 h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-white" />
+                    ) : null}
+                  </button>
+
+                  {notificationPanelOpen ? (
+                    <div className="absolute right-0 top-14 z-30 w-[min(92vw,24rem)] overflow-hidden rounded-[28px] border border-white/80 bg-white/95 shadow-[0_30px_70px_-35px_rgba(15,23,42,0.45)] backdrop-blur">
+                      <div className="border-b border-slate-200 px-5 py-4">
+                        <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Повідомлення</p>
+                        <p className="mt-2 text-lg font-semibold text-slate-950">
+                          {unreadCount > 0 ? `Є нові: ${unreadCount}` : 'Тут усе спокійно'}
+                        </p>
+                      </div>
+                      <div className="max-h-[26rem] overflow-y-auto p-3">
+                        {notificationItems.length > 0 ? (
+                          <div className="grid gap-3">
+                            {notificationItems.map((item) => (
+                              <article key={item.id} className="rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-4">
+                                <p className="font-semibold text-slate-900">{item.title}</p>
+                                <p className="mt-1 text-sm leading-6 text-slate-600">{item.description}</p>
+                                <p className="mt-2 text-xs uppercase tracking-[0.18em] text-slate-400">
+                                  {formatDate(item.createdAt)}
+                                </p>
+                              </article>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="rounded-[22px] border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">
+                            Повідомлень поки немає. Якщо щось зміниться — ми підкажемо.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+
                 <div className="rounded-full border border-slate-300 bg-white px-4 py-2 text-center text-sm text-slate-700">
                   {currentUser.fullName}
                 </div>
@@ -108,7 +195,7 @@ export function AppShell({
             </div>
           </header>
 
-          <main className="flex-1 px-4 py-5 pb-28 sm:px-6 sm:pb-32 lg:px-8 lg:py-8 lg:pb-8">
+          <main className="flex-1 px-4 pt-6 pb-28 sm:px-6 sm:pb-32 lg:px-8 lg:pt-8 lg:pb-8">
             <Outlet context={currentUser} />
           </main>
         </div>
@@ -135,7 +222,7 @@ export function AppShell({
               className="mt-auto bg-white/10 text-white hover:bg-white/15 hover:text-white"
               onClick={() => setMobileNavOpen(false)}
             >
-              Закрити меню
+              Закрити
             </SecondaryButton>
           </div>
         </div>
@@ -167,12 +254,13 @@ export function AppShell({
 
 function BrandBlock() {
   return (
-    <div className="mb-8 rounded-[28px] border border-white/10 bg-white/5 p-5">
-      <p className="text-xs uppercase tracking-[0.34em] text-white/55">e-Dormitory</p>
-      <h1 className="mt-4 font-display text-2xl text-white xl:text-3xl">Кабінет гуртожитку</h1>
-      <p className="mt-3 text-sm leading-6 text-white/70">
-        Усі щоденні дії для мешканців і персоналу в одному зручному просторі.
-      </p>
+    <div className="mb-4 flex items-center justify-center rounded-[22px] border border-white/10 bg-white/8 px-3 py-4">
+      <div className="text-center">
+        <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-2xl bg-white/95 text-sm font-black tracking-[0.18em] text-[var(--color-accent)]">
+          ED
+        </div>
+        <p className="mt-2 text-[11px] font-semibold tracking-tight text-white">e-Dormitory</p>
+      </div>
     </div>
   )
 }
@@ -197,18 +285,15 @@ function NavPanel({
             key={item.to}
             to={item.to}
             onClick={onNavigate}
-            className={`flex items-start gap-3 rounded-[24px] px-4 py-4 transition ${active ? 'bg-[linear-gradient(135deg,#f8fafc_0%,#dbeafe_100%)] text-slate-950 ring-1 ring-white/70 shadow-[0_22px_48px_-28px_rgba(15,23,42,0.8)]' : 'text-white/78 hover:bg-white/8 hover:text-white'}`}
+            className={`flex min-h-[72px] items-center justify-between gap-3 rounded-[22px] px-3 py-3 text-left transition ${active ? 'bg-white text-slate-950 ring-1 ring-white/70 shadow-[0_22px_48px_-28px_rgba(15,23,42,0.8)]' : 'text-white/88 hover:bg-white/12 hover:text-white'}`}
           >
+            <span className={`min-w-0 flex-1 text-sm font-semibold leading-5 ${active ? 'text-slate-950' : 'text-white'}`}>
+              {item.shortLabel}
+            </span>
             <span
-              className={`mt-0.5 inline-flex h-10 w-10 items-center justify-center rounded-2xl ${active ? 'bg-[var(--color-accent)] text-white shadow-sm' : 'bg-white/10 text-white'}`}
+              className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl ${active ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent)]' : 'bg-white/10 text-white'}`}
             >
               <Icon className="h-5 w-5" />
-            </span>
-            <span className="min-w-0">
-              <span className={`block font-semibold ${active ? 'text-slate-950' : ''}`}>{item.label}</span>
-              <span className={`mt-1 block text-sm leading-6 ${active ? 'text-slate-700' : 'text-white/58'}`}>
-                {item.description}
-              </span>
             </span>
           </NavLink>
         )

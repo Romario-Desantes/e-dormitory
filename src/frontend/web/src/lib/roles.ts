@@ -19,97 +19,103 @@ const roleTitle: Record<UserRole, string> = {
 }
 
 const roleDescription: Record<UserRole, string> = {
-  Student: 'Мешканець гуртожитку, який подає заявки, оформлює перепустки та сплачує нарахування.',
-  Commandant: 'Керує кімнатами, переселеннями та дисциплінарними записами.',
-  Master: 'Опрацьовує ремонтні заявки та фіксує виконані роботи.',
-  Guard: 'Перевіряє перепустки й контролює вхід та вихід гостей.',
-  Accountant: 'Контролює нарахування, платежі та підтвердження оплат.',
-  Admin: 'Керує акаунтами, ролями, тарифами та системними довідниками.',
+  Student: 'Допомагає швидко вирішувати побутові питання в гуртожитку.',
+  Commandant: 'Допомагає підтримувати порядок із кімнатами та зверненнями студентів.',
+  Master: 'Бачить прохання про допомогу з ремонтом і позначає виконані роботи.',
+  Guard: 'Швидко перевіряє гостьові перепустки на вході.',
+  Accountant: 'Допомагає бачити оплати й нарахування без зайвої плутанини.',
+  Admin: 'Налаштовує користувачів, ролі та довідники системи.',
 }
 
 const navigationMap: Record<UserRole, NavItem[]> = {
   Student: [
     {
       to: '/app/overview',
-      label: 'Головна',
-      shortLabel: 'Головна',
-      description: 'Баланс, перепустки та швидкі дії',
+      label: 'Гуртожиток',
+      shortLabel: 'Гуртожиток',
+      description: 'Коротко про оплату, гостей і ваші прохання',
     },
     {
       to: '/app/tickets',
-      label: 'Заявки',
-      shortLabel: 'Заявки',
-      description: 'Звернення на ремонт і їхній стан',
+      label: 'Мої прохання',
+      shortLabel: 'Прохання',
+      description: 'Попросити про ремонт або подати на переселення',
     },
     {
       to: '/app/passes',
-      label: 'Перепустки',
+      label: 'Гості',
       shortLabel: 'Гості',
-      description: 'Запрошення гостей та QR-коди',
+      description: 'Запросити гостя й показати QR-код охороні',
     },
     {
       to: '/app/finance',
-      label: 'Фінанси',
-      shortLabel: 'Оплата',
-      description: 'Баланс, нарахування та оплати',
+      label: 'Мої фінанси',
+      shortLabel: 'Фінанси',
+      description: 'Перевірити оплату проживання',
     },
   ],
   Commandant: [
     {
       to: '/app/occupancy',
-      label: 'Шахматка',
+      label: 'Кімнати',
       shortLabel: 'Кімнати',
-      description: 'Заселення та вільні місця',
+      description: 'Хто де живе та де є вільні місця',
     },
     {
       to: '/app/relocations',
       label: 'Переселення',
       shortLabel: 'Запити',
-      description: 'Погодження заяв на переселення',
+      description: 'Відповісти на прохання студентів',
     },
     {
       to: '/app/discipline',
-      label: 'Порушення',
-      shortLabel: 'Порушення',
-      description: 'Пошук студента та записи',
+      label: 'Зауваження',
+      shortLabel: 'Зауваження',
+      description: 'Акуратно вести історію важливих ситуацій',
     },
   ],
   Master: [
     {
       to: '/app/tasks',
-      label: 'Завдання',
-      shortLabel: 'Завдання',
-      description: 'Дошка ремонтів і коментарі',
+      label: 'Ремонти',
+      shortLabel: 'Ремонти',
+      description: 'Прохання студентів, які треба полагодити',
     },
   ],
   Guard: [
     {
       to: '/app/guard',
-      label: 'Термінал',
-      shortLabel: 'Термінал',
-      description: 'Перевірка перепусток і проходів',
+      label: 'Вхід',
+      shortLabel: 'Вхід',
+      description: 'Перевірити QR-код гостя',
     },
   ],
   Accountant: [
     {
       to: '/app/payments',
-      label: 'Платежі',
-      shortLabel: 'Платежі',
-      description: 'Нарахування, квитанції та звірка',
+      label: 'Оплати',
+      shortLabel: 'Оплати',
+      description: 'Нарахування та підтвердження платежів',
     },
   ],
   Admin: [
     {
-      to: '/app/users',
-      label: 'Користувачі',
-      shortLabel: 'Користувачі',
-      description: 'Акаунти та ролі',
+      to: '/app/students',
+      label: 'Студенти',
+      shortLabel: 'Студенти',
+      description: 'Мешканці, кімнати й контакти',
+    },
+    {
+      to: '/app/staff',
+      label: 'Персонал',
+      shortLabel: 'Персонал',
+      description: 'Команда гуртожитку та доступи',
     },
     {
       to: '/app/directories',
-      label: 'Довідники',
-      shortLabel: 'Довідники',
-      description: 'Категорії, тарифи та налаштування',
+      label: 'Налаштування',
+      shortLabel: 'Налаштув.',
+      description: 'Тарифи, категорії та службові списки',
     },
   ],
 }
@@ -120,7 +126,7 @@ const roleDefaults: Record<UserRole, string> = {
   Master: '/app/tasks',
   Guard: '/app/guard',
   Accountant: '/app/payments',
-  Admin: '/app/users',
+  Admin: '/app/students',
 }
 
 export function normalizeRole(role: string | null | undefined): UserRole | null {
@@ -138,7 +144,7 @@ export function getRoleTitle(role: string | null | undefined) {
 
 export function getRoleDescription(role: string | null | undefined) {
   const normalizedRole = normalizeRole(role)
-  return normalizedRole ? roleDescription[normalizedRole] : 'Опис ролі недоступний.'
+  return normalizedRole ? roleDescription[normalizedRole] : 'Поки не знаємо, який це доступ.'
 }
 
 export function getNavigation(role: UserRole): NavItem[] {

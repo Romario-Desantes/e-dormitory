@@ -96,14 +96,14 @@ export function MasterTasksPage() {
 
   return (
     <PageSection
-      eyebrow="Завдання"
-      title="Дошка робіт"
-      description="Перетягуйте картки між колонками, щоб швидко оновлювати стан робіт."
+      eyebrow="Ремонти"
+      title="Що треба полагодити"
+      description="Перетягуйте картки між колонками, щоб команда бачила актуальний стан роботи."
     >
       {tickets.length === 0 ? (
         <EmptyState
-          title="Наразі немає заявок"
-          description="Нові звернення мешканців з’являться тут."
+          title="Поки все спокійно"
+          description="Нові прохання від мешканців з’являться тут, щойно їх створять."
         />
       ) : (
         <div className="grid gap-5 lg:grid-cols-3">
@@ -149,7 +149,7 @@ export function MasterTasksPage() {
         </div>
       )}
 
-      <Modal open={Boolean(pendingComplete)} onClose={() => setPendingComplete(null)} title="Коментар до завершення">
+      <Modal open={Boolean(pendingComplete)} onClose={() => setPendingComplete(null)} title="Що зробили?">
         <div className="grid gap-4">
           <p className="text-sm text-slate-600">
             Додайте короткий коментар, щоб мешканець побачив результат роботи.
@@ -211,9 +211,9 @@ export function MasterTaskDetailPage() {
 
   return (
     <PageSection
-      eyebrow="Заявка"
+      eyebrow="Прохання"
       title={ticket?.title ?? 'Деталі'}
-      description={ticket ? `Кімната ${ticket.roomNumber}` : 'Завантажуємо дані.'}
+      description={ticket ? `Кімната ${ticket.roomNumber}` : 'Завантажуємо деталі.'}
       actions={<SecondaryButton onClick={() => navigate('/app/tasks')}><ArrowLeft className="mr-2 h-4 w-4" />Назад</SecondaryButton>}
     >
       {ticket ? (
@@ -236,7 +236,7 @@ export function MasterTaskDetailPage() {
                 ))}
               </div>
             ) : (
-              <EmptyState title="Фото немає" description="Мешканець не додав фото до цього звернення." />
+          <EmptyState title="Фото немає" description="Студент не додав фото, тож орієнтуйтеся на опис." />
             )}
           </div>
 
@@ -247,7 +247,7 @@ export function MasterTaskDetailPage() {
                   <Wrench className="h-6 w-6" />
                 </span>
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Картка заявки</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Деталі прохання</p>
                   <h2 className="text-2xl font-semibold text-slate-950">Деталі</h2>
                 </div>
               </div>
@@ -294,7 +294,7 @@ export function MasterTaskDetailPage() {
           </div>
         </div>
       ) : (
-        <EmptyState title="Дані недоступні" description="Не вдалося знайти заявку або вона вже недоступна." />
+      <EmptyState title="Не знайшли це прохання" description="Можливо, його вже закрили або воно більше недоступне." />
       )}
     </PageSection>
   )

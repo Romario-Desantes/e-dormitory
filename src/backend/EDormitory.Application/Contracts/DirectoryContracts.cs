@@ -39,4 +39,5 @@ public interface IDirectoryService
     Task<IReadOnlyCollection<TariffResponse>> GetTariffsAsync(CancellationToken cancellationToken = default);
     Task<TariffResponse> CreateTariffAsync(UpsertTariffRequest request, CancellationToken cancellationToken = default);
     Task<TariffResponse> UpdateTariffAsync(Guid tariffId, UpsertTariffRequest request, CancellationToken cancellationToken = default);
+    Task DeleteTariffAsync(Guid tariffId, CancellationToken cancellationToken = default);
 }

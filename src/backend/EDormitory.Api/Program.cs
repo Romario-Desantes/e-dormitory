@@ -155,7 +155,10 @@ app.UseSwagger();
 app.UseSwaggerUI();
 app.UseHttpsRedirection();
 app.UseCors();
-app.UseRateLimiter();
+if (!app.Environment.IsEnvironment("Testing"))
+{
+    app.UseRateLimiter();
+}
 app.UseAuthentication();
 app.UseMiddleware<CsrfProtectionMiddleware>();
 app.UseMiddleware<SessionActivityMiddleware>();
@@ -164,12 +167,35 @@ app.UseAuthorization();
 app.MapGet("/api/health", () => Results.Ok(new { status = "ok" }));
 app.MapControllers();
 
-using (var scope = app.Services.CreateScope())
-{
-    var seeder = scope.ServiceProvider.GetRequiredService<EDormitory.Infrastructure.Services.DataSeeder>();
-    await seeder.SeedAsync();
-}
+await SeedDatabaseWithRetryAsync(app);
 
 app.Run();
+
+static async Task SeedDatabaseWithRetryAsync(WebApplication app)
+{
+    const int maxAttempts = 10;
+    var delay = TimeSpan.FromSeconds(3);
+
+    for (var attempt = 1; attempt <= maxAttempts; attempt++)
+    {
+        try
+        {
+            using var scope = app.Services.CreateScope();
+            var seeder = scope.ServiceProvider.GetRequiredService<EDormitory.Infrastructure.Services.DataSeeder>();
+            await seeder.SeedAsync();
+            app.Logger.LogInformation("Database seed completed on attempt {Attempt}.", attempt);
+            return;
+        }
+        catch (Exception ex) when (attempt < maxAttempts)
+        {
+            app.Logger.LogWarning(ex, "Database is not ready yet. Retry {Attempt}/{MaxAttempts} in {DelaySeconds} seconds.", attempt, maxAttempts, delay.TotalSeconds);
+            await Task.Delay(delay);
+        }
+    }
+
+    using var finalScope = app.Services.CreateScope();
+    var finalSeeder = finalScope.ServiceProvider.GetRequiredService<EDormitory.Infrastructure.Services.DataSeeder>();
+    await finalSeeder.SeedAsync();
+}
 
 public partial class Program;

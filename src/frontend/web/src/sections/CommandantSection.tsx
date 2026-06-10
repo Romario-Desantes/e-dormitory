@@ -24,7 +24,7 @@ export function CommandantSection({ isAdminView = false }: { isAdminView?: boole
   const usersQuery = useQuery({ queryKey: ['users'], queryFn: getUsers })
   const roomsQuery = useQuery({ queryKey: ['rooms'], queryFn: getRooms })
   const relocationsQuery = useQuery({ queryKey: ['relocations'], queryFn: getRelocations })
-  const violationsQuery = useQuery({ queryKey: ['violations'], queryFn: getViolations })
+  const violationsQuery = useQuery({ queryKey: ['violations'], queryFn: () => getViolations() })
 
   const violationForm = useForm<ViolationFormValues>({
     resolver: zodResolver(violationSchema),

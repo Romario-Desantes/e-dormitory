@@ -97,8 +97,8 @@ export function AccountantPaymentsPage() {
   return (
     <PageSection
       eyebrow="Бухгалтер"
-      title="Платежі та ручне підтвердження"
-      description="Фільтри нижче одночасно звужують список нарахувань і журнал оплат. Пошук працює за назвою нарахування, способом оплати та номером квитанції."
+      title="Оплати студентів"
+      description="Швидко знайдіть потрібну оплату, перевірте квитанцію й підтвердьте платіж без зайвих переходів."
     >
       <div className="grid gap-5 lg:grid-cols-3">
         <HeroMetric
@@ -116,7 +116,7 @@ export function AccountantPaymentsPage() {
         <HeroMetric
           label="Записів після фільтра"
           value={`${filteredCharges.length} / ${filteredPayments.length}`}
-          meta="Ліворуч показані нарахування, праворуч — журнал оплат після застосованих фільтрів."
+          meta="Ліворуч показані відкриті оплати, праворуч — платежі після застосованих фільтрів."
           tone="sky"
         />
       </div>
@@ -204,7 +204,7 @@ export function AccountantPaymentsPage() {
             </span>
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
-                Журнал оплат
+                Історія оплат
               </p>
               <h2 className="text-2xl font-semibold text-slate-950">Квитанції та статуси</h2>
             </div>
@@ -246,7 +246,7 @@ export function AccountantPaymentsPage() {
           setSelectedPayment(null)
           setReceiptReference('')
         }}
-        title="Підтвердження оплати"
+        title="Підтвердити оплату"
       >
         {selectedPayment ? (
           <div className="grid gap-5">

@@ -142,7 +142,11 @@ public sealed class PaymentService(
     public async Task<IReadOnlyCollection<PaymentResponse>> GetPaymentsAsync(CancellationToken cancellationToken = default)
     {
         EnsureRole(UserRole.Student, UserRole.Accountant, UserRole.Admin);
-        var query = dbContext.Payments.Include(x => x.User).AsQueryable();
+        var query = dbContext.Payments
+            .IgnoreQueryFilters()
+            .Where(x => x.IsActive)
+            .Include(x => x.User)
+            .AsQueryable();
         if (currentUser.Role == UserRole.Student)
         {
             query = query.Where(x => x.UserId == currentUser.UserId);
@@ -155,13 +159,22 @@ public sealed class PaymentService(
     public async Task<IReadOnlyCollection<ChargeResponse>> GetChargesAsync(CancellationToken cancellationToken = default)
     {
         EnsureRole(UserRole.Student, UserRole.Accountant, UserRole.Admin);
-        var query = dbContext.StudentCharges.AsQueryable();
+        var query = dbContext.StudentCharges
+            .IgnoreQueryFilters()
+            .Where(x => x.IsActive)
+            .Include(x => x.User)
+            .AsQueryable();
         if (currentUser.Role == UserRole.Student)
         {
             query = query.Where(x => x.UserId == currentUser.UserId);
         }
+        else
+        {
+            query = query.Where(x => x.User.IsActive);
+        }
 
-        var items = await query.OrderByDescending(x => x.DueDate).ToListAsync(cancellationToken);
+        var items = await query.ToListAsync(cancellationToken);
+        items = items.OrderByDescending(x => x.DueDate).ToList();
         return items.Select(x => x.ToResponse()).ToList();
     }
 
@@ -270,7 +283,11 @@ public sealed class PaymentService(
 
     private async Task<PaymentResponse> GetPaymentByIdAsync(Guid id, CancellationToken cancellationToken)
     {
-        var payment = await dbContext.Payments.Include(x => x.User).FirstAsync(x => x.Id == id, cancellationToken);
+        var payment = await dbContext.Payments
+            .IgnoreQueryFilters()
+            .Where(x => x.IsActive)
+            .Include(x => x.User)
+            .FirstAsync(x => x.Id == id, cancellationToken);
         return payment.ToResponse();
     }
 
@@ -365,6 +382,26 @@ public sealed class DirectoryService(
         await dbContext.SaveChangesAsync(cancellationToken);
         await auditService.LogAsync(nameof(TariffPlan), tariff.Id, "directory.tariff.updated", currentUser.UserId, new { tariff.Name, tariff.MonthlyRate }, cancellationToken);
         return tariff.ToResponse();
+    }
+
+    public async Task DeleteTariffAsync(Guid tariffId, CancellationToken cancellationToken = default)
+    {
+        EnsureRole(UserRole.Admin);
+        var tariff = await dbContext.Tariffs.FirstOrDefaultAsync(x => x.Id == tariffId, cancellationToken)
+            ?? throw new NotFoundException("РўР°СЂРёС„ РЅРµ Р·РЅР°Р№РґРµРЅРѕ.");
+
+        if (tariff.IsDefault)
+        {
+            var hasFallbackDefault = await dbContext.Tariffs.AnyAsync(x => x.Id != tariff.Id && x.IsDefault, cancellationToken);
+            if (!hasFallbackDefault)
+            {
+                throw new ConflictException("Неможливо видалити тариф за замовчуванням, доки не буде призначено інший.");
+            }
+        }
+
+        tariff.SoftDelete(currentUser.UserId);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await auditService.LogAsync(nameof(TariffPlan), tariff.Id, "directory.tariff.deleted", currentUser.UserId, new { tariff.Name }, cancellationToken);
     }
 
     private async Task ClearDefaultTariffsAsync(CancellationToken cancellationToken, Guid? exceptId = null)
@@ -489,6 +526,24 @@ public sealed class DataSeeder(
                 "IsActive" boolean NOT NULL DEFAULT TRUE,
                 CONSTRAINT "PK_Tariffs" PRIMARY KEY ("Id")
             );
+            """,
+            cancellationToken);
+
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            CREATE TABLE IF NOT EXISTS "NotificationStates" (
+                "Id" uuid NOT NULL,
+                "UserId" uuid NOT NULL,
+                "LastReadAt" timestamp with time zone NULL,
+                "CreatedAt" timestamp with time zone NOT NULL,
+                "UpdatedAt" timestamp with time zone NULL,
+                "CreatedBy" uuid NULL,
+                "UpdatedBy" uuid NULL,
+                "IsActive" boolean NOT NULL DEFAULT TRUE,
+                CONSTRAINT "PK_NotificationStates" PRIMARY KEY ("Id"),
+                CONSTRAINT "FK_NotificationStates_Users_UserId" FOREIGN KEY ("UserId") REFERENCES "Users" ("Id") ON DELETE RESTRICT
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_NotificationStates_UserId" ON "NotificationStates" ("UserId");
             """,
             cancellationToken);
     }

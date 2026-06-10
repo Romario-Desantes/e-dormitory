@@ -46,8 +46,11 @@ const GuardTerminalPage = lazy(() =>
 const AccountantPaymentsPage = lazy(() =>
   import('./pages/AccountantPage').then((module) => ({ default: module.AccountantPaymentsPage })),
 )
-const AdminUsersPage = lazy(() =>
-  import('./pages/AdminPages').then((module) => ({ default: module.AdminUsersPage })),
+const AdminStudentsPage = lazy(() =>
+  import('./pages/AdminPages').then((module) => ({ default: module.AdminStudentsPage })),
+)
+const AdminStaffPage = lazy(() =>
+  import('./pages/AdminPages').then((module) => ({ default: module.AdminStaffPage })),
 )
 const AdminDirectoriesPage = lazy(() =>
   import('./pages/AdminPages').then((module) => ({ default: module.AdminDirectoriesPage })),
@@ -171,7 +174,9 @@ function renderRoleRoutes(session: { id: string; role: UserRole }) {
       return (
         <>
           <Route index element={<Navigate to={defaultRoute} replace />} />
-          <Route path="users" element={<AdminUsersPage />} />
+          <Route path="students" element={<AdminStudentsPage />} />
+          <Route path="staff" element={<AdminStaffPage />} />
+          <Route path="users" element={<Navigate to="/app/students" replace />} />
           <Route path="directories" element={<AdminDirectoriesPage />} />
           <Route path="*" element={<Navigate to={defaultRoute} replace />} />
         </>
@@ -190,9 +195,9 @@ function LoadingScreen({ compact = false }: { compact?: boolean }) {
         <p className="text-xs font-semibold uppercase tracking-[0.34em] text-[var(--color-accent)]">
           e-Dormitory
         </p>
-        <h1 className="mt-5 font-display text-4xl text-slate-950">Вхід до системи…</h1>
+        <h1 className="mt-5 font-display text-4xl text-slate-950">Заходимо в кабінет…</h1>
         <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-600 sm:text-base">
-          Готуємо ваш кабінет і відкриваємо потрібні розділи.
+          Готуємо потрібні розділи. Це займе лише мить.
         </p>
       </div>
     </div>

@@ -52,7 +52,7 @@ export function GuardTerminalPage() {
   const validateMutation = useMutation({
     mutationFn: (accessCode: string) => validatePass({ accessCode }),
     onSuccess: async () => {
-      setMessage('Прохід зафіксовано')
+      setMessage('Готово! Гість може проходити.')
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['passLogs'] }),
         queryClient.invalidateQueries({ queryKey: ['passes'] }),
@@ -65,7 +65,7 @@ export function GuardTerminalPage() {
     onError: () => {
       setResultState('invalid')
       setCheckedPass(null)
-      setMessage('Код недійсний або термін дії перепустки завершився')
+      setMessage('Цей QR-код не спрацював. Перевірте дату перепустки або попросіть студента створити нову.')
     },
   })
 
@@ -81,8 +81,8 @@ export function GuardTerminalPage() {
   return (
     <PageSection
       eyebrow="Охорона"
-      title="Термінал перевірки"
-      description="Скануйте QR-код або введіть номер вручну, щоб швидко перевірити перепустку."
+      title="Перевірка гостя"
+      description="Скануйте QR-код або введіть номер вручну — система одразу підкаже, чи можна пропускати гостя."
     >
       <div className="grid gap-5 lg:grid-cols-[1.08fr_0.92fr]">
         <SurfaceCard className="overflow-hidden bg-[linear-gradient(180deg,#0f172a_0%,#12343b_100%)] text-white">
@@ -197,7 +197,7 @@ export function GuardTerminalPage() {
       <SurfaceCard>
         <div className="mb-5">
           <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Останні проходи</p>
-          <h2 className="text-2xl font-semibold text-slate-950">Журнал</h2>
+          <h2 className="text-2xl font-semibold text-slate-950">Останні проходи</h2>
         </div>
         <div className="grid gap-3">
           {(passLogsQuery.data ?? []).slice(0, 6).map((log) => (

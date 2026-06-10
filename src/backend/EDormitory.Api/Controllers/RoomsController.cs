@@ -38,8 +38,8 @@ public sealed class RoomsController(IRoomService roomService) : ControllerBase
         Ok(await roomService.ReviewRelocationRequestAsync(id, request, cancellationToken));
 
     [HttpGet("violations")]
-    public async Task<ActionResult<IReadOnlyCollection<ViolationResponse>>> GetViolations(CancellationToken cancellationToken) =>
-        Ok(await roomService.GetViolationsAsync(cancellationToken));
+    public async Task<ActionResult<IReadOnlyCollection<ViolationResponse>>> GetViolations([FromQuery] Guid? userId, CancellationToken cancellationToken) =>
+        Ok(await roomService.GetViolationsAsync(userId, cancellationToken));
 
     [HttpPost("violations")]
     [Authorize(Policy = Policies.ManageRooms)]

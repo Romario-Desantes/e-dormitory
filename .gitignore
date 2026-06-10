@@ -15,3 +15,5 @@ coverage/
 Requirements/
 out/
 tmp-ticket-upload.png
+BACKEND_EXPLANATION.local.md
+FRONTEND_EXPLANATION.local.md

@@ -21,7 +21,7 @@ export interface AuthenticatedUser {
   role: UserRole
   roomId: string | null
   mustChangePassword: boolean
-  balance: number
+  debtAmount: number | null
 }
 
 export interface Room {
@@ -44,7 +44,7 @@ export interface RoomResident {
   fullName: string
   phone: string
   role: string
-  balance: number
+  debtAmount: number | null
 }
 
 export interface RoomDetail extends Room {
@@ -138,7 +138,7 @@ export interface DormUser {
   phone: string
   role: UserRole
   roomId: string | null
-  balance: number
+  debtAmount: number | null
   mustChangePassword: boolean
   isActive: boolean
 }
@@ -151,7 +151,7 @@ export interface UserLookup {
   role: string
   roomId: string | null
   roomNumber: string | null
-  balance: number
+  debtAmount: number | null
 }
 
 export interface RelocationRequest {
@@ -194,6 +194,11 @@ export interface NotificationItem {
   description: string
   tone: string
   createdAt: string
+}
+
+export interface NotificationFeed {
+  items: NotificationItem[]
+  unreadCount: number
 }
 
 export interface RoleDirectory {

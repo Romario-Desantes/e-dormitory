@@ -7,6 +7,11 @@ services:
       POSTGRES_PASSWORD: postgres
     ports:
       - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d edormitory"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
     volumes:
       - postgres-data:/var/lib/postgresql/data
 
@@ -36,8 +41,10 @@ services:
       Storage__Provider: Disk
       Storage__RootPath: /app/storage
     depends_on:
-      - postgres
-      - minio
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_started
     ports:
       - "8080:8080"
     volumes:
@@ -47,14 +54,21 @@ services:
     build:
       context: ..
       dockerfile: infrastructure/Dockerfile.web
-      args:
-        VITE_API_BASE_URL: http://localhost:8080/api
+      target: dev
     depends_on:
       - api
     ports:
-      - "3000:80"
+      - "3000:5173"
+    environment:
+      CHOKIDAR_USEPOLLING: "true"
+      VITE_API_BASE_URL: /api
+      VITE_DEV_API_PROXY_TARGET: http://api:8080
+    volumes:
+      - ../src/frontend/web:/app
+      - web-node-modules:/app/node_modules
 
 volumes:
   postgres-data:
   minio-data:
   api-storage:
+  web-node-modules:

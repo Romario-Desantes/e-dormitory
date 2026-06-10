@@ -12,7 +12,7 @@ public sealed record AuthenticatedUserResponse(
     string Role,
     Guid? RoomId,
     bool MustChangePassword,
-    decimal Balance);
+    decimal? DebtAmount);
 
 public sealed record AuthResponse(AuthenticatedUserResponse User, DateTimeOffset ExpiresAt);
 

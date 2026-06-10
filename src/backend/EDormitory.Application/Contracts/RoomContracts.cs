@@ -6,7 +6,7 @@ public sealed record RoomResponse(Guid Id, string RoomNumber, int Floor, int Cap
 
 public sealed record RoomOccupancyResponse(int Floor, IReadOnlyCollection<RoomResponse> Rooms);
 
-public sealed record RoomResidentResponse(Guid Id, string FullName, string Phone, string Role, decimal Balance);
+public sealed record RoomResidentResponse(Guid Id, string FullName, string Phone, string Role, decimal? DebtAmount);
 
 public sealed record RoomDetailResponse(
     Guid Id,
@@ -89,5 +89,5 @@ public interface IRoomService
     Task<IReadOnlyCollection<RelocationRequestResponse>> GetRelocationRequestsAsync(CancellationToken cancellationToken = default);
     Task<RelocationRequestResponse> ReviewRelocationRequestAsync(Guid requestId, ReviewRelocationRequest request, CancellationToken cancellationToken = default);
     Task<ViolationResponse> CreateViolationAsync(CreateViolationRequest request, CancellationToken cancellationToken = default);
-    Task<IReadOnlyCollection<ViolationResponse>> GetViolationsAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyCollection<ViolationResponse>> GetViolationsAsync(Guid? userId = null, CancellationToken cancellationToken = default);
 }

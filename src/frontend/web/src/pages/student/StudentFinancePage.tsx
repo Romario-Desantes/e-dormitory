@@ -23,11 +23,11 @@ import { confirmPayment, createPayment, getCharges, getPayments } from '../../li
 import { formatDate, formatMoney } from '../../lib/format'
 
 const sandboxPaymentSchema = z.object({
-  chargeId: z.string().min(1),
-  cardNumber: z.string().min(19),
-  expiry: z.string().min(5),
-  cvv: z.string().min(3),
-  cardholder: z.string().min(3),
+  chargeId: z.string().min(1, 'Оберіть, що саме хочете оплатити.'),
+  cardNumber: z.string().min(19, 'Перевірте номер картки — має бути 16 цифр.'),
+  expiry: z.string().min(5, 'Вкажіть строк дії у форматі MM/YY.'),
+  cvv: z.string().min(3, 'CVV — це 3 цифри на звороті картки.'),
+  cardholder: z.string().min(3, 'Вкажіть ім’я власника картки.'),
 })
 
 type SandboxPaymentFormValues = z.infer<typeof sandboxPaymentSchema>
@@ -131,7 +131,7 @@ export function StudentFinancePage() {
     <PageSection
       eyebrow="Фінанси"
       title="Оплата проживання"
-      description="Перегляньте баланс, історію оплат і проведіть тестову оплату без збереження банківських даних."
+      description="Подивіться, що потрібно оплатити, і проведіть оплату в безпечному тестовому режимі."
       actions={
         <PrimaryButton onClick={openPaymentModal} disabled={!hasOutstandingCharges}>
           <CreditCard className="mr-2 h-4 w-4" />
@@ -141,12 +141,12 @@ export function StudentFinancePage() {
     >
       <div className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
         <HeroMetric
-          label="Баланс"
-          value={formatMoney(currentUser.balance)}
+          label="До сплати"
+          value={formatMoney(currentUser.debtAmount ?? 0)}
           meta={
             hasOutstandingCharges
-              ? 'Є відкриті нарахування, які ще потрібно закрити.'
-              : 'Наразі всі нарахування сплачені.'
+              ? 'Є сума, яку можна оплатити прямо тут.'
+              : 'Усе добре — зараз нічого оплачувати не потрібно.'
           }
           tone={hasOutstandingCharges ? 'rose' : 'emerald'}
         />
@@ -154,12 +154,12 @@ export function StudentFinancePage() {
           <MetricTile
             label="До сплати"
             value={formatMoney(totalOutstanding)}
-            note="Загальна сума всіх активних нарахувань."
+            note="Разом за всіма відкритими оплатами."
           />
           <MetricTile
             label="Платежі"
             value={String(payments.length)}
-            note="Усі операції, які вже є у вашій історії."
+            note="Усе, що вже потрапило в історію."
           />
         </div>
       </div>
@@ -169,12 +169,12 @@ export function StudentFinancePage() {
           <div className="mb-5 flex items-center justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
-                Нарахування
+                До оплати
               </p>
-              <h2 className="text-2xl font-semibold text-slate-950">Що потрібно оплатити</h2>
+              <h2 className="text-2xl font-semibold text-slate-950">Що зараз відкрите</h2>
             </div>
             <Badge tone={hasOutstandingCharges ? 'rose' : 'emerald'}>
-              {hasOutstandingCharges ? 'Є борг' : 'Все сплачено'}
+              {hasOutstandingCharges ? 'Є що оплатити' : 'Усе сплачено'}
             </Badge>
           </div>
 
@@ -200,7 +200,7 @@ export function StudentFinancePage() {
           ) : (
             <EmptyState
               title="Відкритих нарахувань немає"
-              description="Коли адміністратор або бухгалтер створить нове нарахування, воно з’явиться тут."
+              description="Схоже, зараз усе спокійно. Якщо з’явиться нова оплата, ми покажемо її тут."
             />
           )}
         </SurfaceCard>
@@ -208,9 +208,9 @@ export function StudentFinancePage() {
         <SurfaceCard>
           <div className="mb-5">
             <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
-              Історія оплат
-            </p>
-            <h2 className="text-2xl font-semibold text-slate-950">Останні операції</h2>
+                Історія оплат
+              </p>
+            <h2 className="text-2xl font-semibold text-slate-950">Останні платежі</h2>
           </div>
           {payments.length > 0 ? (
             <div className="grid max-h-[520px] gap-4 overflow-y-auto pr-2">
@@ -235,8 +235,8 @@ export function StudentFinancePage() {
             </div>
           ) : (
             <EmptyState
-              title="Платежів ще немає"
-              description="Після першої оплати тут з’явиться історія всіх ваших операцій."
+              title="Платежів ще не було"
+              description="Після першої оплати тут з’явиться зрозуміла історія платежів."
             />
           )}
         </SurfaceCard>
@@ -245,7 +245,7 @@ export function StudentFinancePage() {
       <Modal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        title="Симуляція платіжного шлюзу"
+        title="Оплата проживання"
       >
         {paymentComplete ? (
           <div className="grid gap-5">
@@ -254,10 +254,10 @@ export function StudentFinancePage() {
                 <CheckCircle2 className="h-8 w-8" />
               </div>
               <h3 className="mt-5 font-display text-3xl text-emerald-950">
-                Оплату успішно проведено
+                Готово! Оплату прийнято
               </h3>
               <p className="mt-3 text-sm leading-6 text-emerald-900">
-                Статус платежу, баланс і журнал подій уже оновлені у вашому кабінеті.
+                Сума й історія платежів уже оновилися у вашому кабінеті.
               </p>
             </div>
             <div className="flex justify-end">
@@ -299,7 +299,7 @@ export function StudentFinancePage() {
 
             <TextField label="Що оплатити">
               <Select {...form.register('chargeId')}>
-                <option value="">Оберіть нарахування</option>
+                <option value="">Оберіть оплату</option>
                 {outstandingCharges.map((charge) => (
                   <option key={charge.id} value={charge.id}>
                     {charge.title} · {formatMoney(charge.amount - charge.paidAmount)}
@@ -351,8 +351,8 @@ export function StudentFinancePage() {
           </form>
         ) : (
           <EmptyState
-            title="Поки що немає чого оплачувати"
-            description="Для цього акаунта ще не створено жодного відкритого нарахування."
+              title="Зараз оплачувати нічого"
+              description="Можна видихнути: відкритих оплат для вашого акаунта немає."
           />
         )}
       </Modal>

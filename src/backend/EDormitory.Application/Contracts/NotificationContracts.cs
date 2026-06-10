@@ -7,7 +7,12 @@ public sealed record NotificationResponse(
     string Tone,
     DateTimeOffset CreatedAt);
 
+public sealed record NotificationFeedResponse(
+    IReadOnlyCollection<NotificationResponse> Items,
+    int UnreadCount);
+
 public interface INotificationService
 {
-    Task<IReadOnlyCollection<NotificationResponse>> GetNotificationsAsync(CancellationToken cancellationToken = default);
+    Task<NotificationFeedResponse> GetNotificationsAsync(CancellationToken cancellationToken = default);
+    Task MarkNotificationsReadAsync(CancellationToken cancellationToken = default);
 }

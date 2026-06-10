@@ -32,4 +32,11 @@ public sealed class DirectoriesController(IDirectoryService directoryService) : 
     [HttpPatch("tariffs/{id:guid}")]
     public async Task<ActionResult<TariffResponse>> UpdateTariff(Guid id, [FromBody] UpsertTariffRequest request, CancellationToken cancellationToken) =>
         Ok(await directoryService.UpdateTariffAsync(id, request, cancellationToken));
+
+    [HttpDelete("tariffs/{id:guid}")]
+    public async Task<IActionResult> DeleteTariff(Guid id, CancellationToken cancellationToken)
+    {
+        await directoryService.DeleteTariffAsync(id, cancellationToken);
+        return NoContent();
+    }
 }
