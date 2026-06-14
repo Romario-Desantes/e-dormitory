@@ -7,8 +7,7 @@ public sealed record CreateUserRequest(
     string Email,
     string Phone,
     string Role,
-    Guid? RoomId,
-    Guid? TariffId);
+    Guid? RoomId);
 
 public sealed record ResetPasswordRequest(Guid UserId, string NewPassword);
 

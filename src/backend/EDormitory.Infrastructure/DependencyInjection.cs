@@ -1,7 +1,6 @@
 using EDormitory.Application.Abstractions;
 using EDormitory.Application.Contracts.Auth;
 using EDormitory.Application.Contracts.Directories;
-using EDormitory.Application.Contracts.Files;
 using EDormitory.Application.Contracts.Notifications;
 using EDormitory.Application.Contracts.Passes;
 using EDormitory.Application.Contracts.Payments;
@@ -16,7 +15,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using System.Text;
 
 namespace EDormitory.Infrastructure;
 
@@ -24,13 +22,10 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
-        var jwtOptions = configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions
-        {
-            SigningKey = Convert.ToBase64String(Encoding.UTF8.GetBytes("edormitory-dev-signing-key-2026")),
-        };
+        var jwtOptions = configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
         if (string.IsNullOrWhiteSpace(jwtOptions.SigningKey))
         {
-            jwtOptions.SigningKey = "edormitory-dev-signing-key-2026";
+            throw new InvalidOperationException("Configuration value 'Auth:SigningKey' is required.");
         }
 
         var storageOptions = configuration.GetSection(StorageOptions.SectionName).Get<StorageOptions>() ?? new StorageOptions();
@@ -64,7 +59,6 @@ public static class DependencyInjection
         services.AddScoped<IPaymentService, PaymentService>();
         services.AddScoped<IDirectoryService, DirectoryService>();
         services.AddScoped<INotificationService, NotificationService>();
-        services.AddScoped<IFileService, FileService>();
         services.AddScoped<IAuditService, AuditService>();
         services.AddScoped<DataSeeder>();
 

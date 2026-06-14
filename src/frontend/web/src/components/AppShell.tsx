@@ -24,6 +24,7 @@ import { getNotifications, markNotificationsRead } from '../lib/api'
 import { getNavigation, getRoleTitle } from '../lib/roles'
 import type { AuthenticatedUser, NavItem } from '../lib/types'
 import { PrimaryButton, SecondaryButton } from './AppPrimitives'
+import logoUrl from '../assets/new_logo.png'
 
 const iconMap: Record<string, LucideIcon> = {
   '/app/overview': LayoutGrid,
@@ -100,9 +101,9 @@ export function AppShell({
 
   return (
     <div className="min-h-screen bg-[var(--color-page)] text-slate-950">
-      <div className="mx-auto flex min-h-screen max-w-[1800px] gap-0 lg:gap-5 lg:p-4">
-        <aside className="hidden w-[176px] shrink-0 lg:block xl:w-[196px]">
-          <div className="sticky top-4 flex h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-[28px] border border-white/55 bg-[linear-gradient(180deg,#183342_0%,#5f7286_100%)] p-3 text-white shadow-[0_30px_80px_-42px_rgba(15,23,42,0.75)]">
+      <div className="min-h-screen lg:pl-[220px]">
+        <aside className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:block lg:w-[220px]">
+          <div className="flex h-full flex-col overflow-hidden border-r border-white/55 bg-[linear-gradient(180deg,#183342_0%,#5f7286_100%)] p-3 text-white shadow-[0_30px_80px_-42px_rgba(15,23,42,0.75)]">
             <BrandBlock />
             <NavPanel
               navigation={navigation}
@@ -113,7 +114,7 @@ export function AppShell({
         </aside>
 
         <div className="flex min-h-screen flex-1 flex-col">
-          <header className="relative z-10 border-b border-white/60 bg-[rgba(247,246,242,0.9)] backdrop-blur lg:rounded-[30px] lg:border lg:bg-[rgba(247,246,242,0.88)]">
+          <header className="border-b border-white/60 bg-[rgba(247,246,242,0.9)] backdrop-blur">
             <div className="flex flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
               <div className="flex min-w-0 items-center gap-3">
                 <button
@@ -195,9 +196,16 @@ export function AppShell({
             </div>
           </header>
 
-          <main className="flex-1 px-4 pt-6 pb-28 sm:px-6 sm:pb-32 lg:px-8 lg:pt-8 lg:pb-8">
+          <main className="flex-1 px-4 pt-6 pb-8 sm:px-6 lg:px-8 lg:pt-8">
             <Outlet context={currentUser} />
           </main>
+
+          <footer className="border-t border-white/60 px-4 py-4 text-sm text-slate-500 sm:px-6 lg:px-8">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p>© 2026 e-Dormitory. Всі права захищені.</p>
+              <p>API v1.0</p>
+            </div>
+          </footer>
         </div>
       </div>
 
@@ -256,8 +264,8 @@ function BrandBlock() {
   return (
     <div className="mb-4 flex items-center justify-center rounded-[22px] border border-white/10 bg-white/8 px-3 py-4">
       <div className="text-center">
-        <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-2xl bg-white/95 text-sm font-black tracking-[0.18em] text-[var(--color-accent)]">
-          ED
+        <div className="mx-auto flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl bg-white/95">
+          <img src={logoUrl} alt="e-Dormitory" className="h-full w-full object-contain p-1" />
         </div>
         <p className="mt-2 text-[11px] font-semibold tracking-tight text-white">e-Dormitory</p>
       </div>
@@ -287,7 +295,7 @@ function NavPanel({
             onClick={onNavigate}
             className={`flex min-h-[72px] items-center justify-between gap-3 rounded-[22px] px-3 py-3 text-left transition ${active ? 'bg-white text-slate-950 ring-1 ring-white/70 shadow-[0_22px_48px_-28px_rgba(15,23,42,0.8)]' : 'text-white/88 hover:bg-white/12 hover:text-white'}`}
           >
-            <span className={`min-w-0 flex-1 text-sm font-semibold leading-5 ${active ? 'text-slate-950' : 'text-white'}`}>
+            <span className={`min-w-0 flex-1 text-[0.95rem] font-semibold leading-5 ${active ? 'text-slate-950' : 'text-white'}`}>
               {item.shortLabel}
             </span>
             <span

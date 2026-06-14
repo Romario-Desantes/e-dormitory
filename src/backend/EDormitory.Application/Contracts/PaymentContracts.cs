@@ -3,7 +3,7 @@ using FluentValidation;
 
 namespace EDormitory.Application.Contracts.Payments;
 
-public sealed record CreatePaymentRequest(Guid? ChargeId, decimal Amount, PaymentMethod PaymentMethod, Guid? ReceiptFileId);
+public sealed record CreatePaymentRequest(Guid? ChargeId, decimal Amount, PaymentMethod PaymentMethod);
 
 public sealed record ConfirmPaymentRequest(string? ExternalReceiptId);
 
@@ -17,7 +17,6 @@ public sealed record PaymentResponse(
     string Status,
     string? ExternalReceiptId,
     DateTimeOffset? PaidAt,
-    Guid? ReceiptFileId,
     Guid? ChargeId);
 
 public sealed record ChargeResponse(Guid Id, string Title, decimal Amount, decimal PaidAmount, string Currency, DateTimeOffset DueDate, bool IsSettled);

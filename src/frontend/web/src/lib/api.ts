@@ -13,11 +13,8 @@ import type {
   Room,
   RoomDetail,
   RoomOccupancy,
-  Tariff,
   Ticket,
-  TicketCategory,
   TicketDetail,
-  UploadedFile,
   UserLookup,
   Violation,
   CreateDormUserPayload,
@@ -29,19 +26,6 @@ const api = axios.create({
   baseURL: apiBaseUrl,
   withCredentials: true,
 })
-
-function resolveApiUrl(path: string) {
-  if (/^https?:\/\//i.test(path)) {
-    return path
-  }
-
-  const normalizedPath = path.startsWith('/') ? path : `/${path}`
-  const baseOrigin = apiBaseUrl.startsWith('http')
-    ? new URL(apiBaseUrl).origin
-    : window.location.origin
-
-  return new URL(normalizedPath, baseOrigin).toString()
-}
 
 const ticketPriorityMap = {
   Low: 1,
@@ -191,38 +175,9 @@ export async function searchUsers(role: string, query: string) {
   return response.data as UserLookup[]
 }
 
-export async function getTicketCategories() {
-  const response = await api.get('/directories/ticket-categories')
-  return response.data as TicketCategory[]
-}
-
-export async function createTicketCategory(payload: { categoryName: string; slaHours: number }) {
-  const response = await api.post('/directories/ticket-categories', payload)
-  return response.data as TicketCategory
-}
-
 export async function getRoles() {
   const response = await api.get('/directories/roles')
   return response.data as RoleDirectory[]
-}
-
-export async function getTariffs() {
-  const response = await api.get('/directories/tariffs')
-  return response.data as Tariff[]
-}
-
-export async function createTariff(payload: { name: string; monthlyRate: number; floor?: number | null; isDefault: boolean }) {
-  const response = await api.post('/directories/tariffs', payload)
-  return response.data as Tariff
-}
-
-export async function updateTariff(id: string, payload: { name: string; monthlyRate: number; floor?: number | null; isDefault: boolean }) {
-  const response = await api.patch(`/directories/tariffs/${id}`, payload)
-  return response.data as Tariff
-}
-
-export async function deleteTariff(id: string) {
-  await api.delete(`/directories/tariffs/${id}`)
 }
 
 export async function getTickets() {
@@ -232,23 +187,14 @@ export async function getTickets() {
 
 export async function getTicketDetail(id: string) {
   const response = await api.get(`/tickets/${id}`)
-  const ticket = response.data as TicketDetail
-
-  return {
-    ...ticket,
-    attachments: (ticket.attachments ?? []).map((attachment) => ({
-      ...attachment,
-      previewUrl: resolveApiUrl(attachment.previewUrl),
-    })),
-  }
+  return response.data as TicketDetail
 }
 
 export async function createTicket(payload: {
-  categoryId: string
+  category: string
   title: string
   description: string
   priority: 'Low' | 'Medium' | 'High' | 'Critical'
-  attachmentIds?: string[]
 }) {
   const response = await api.post('/tickets', {
     ...payload,
@@ -295,7 +241,7 @@ export async function getPayments() {
   return response.data as Payment[]
 }
 
-export async function createPayment(payload: { chargeId?: string | null; amount: number; paymentMethod: 'Manual' | 'MockGateway'; receiptFileId?: string | null }) {
+export async function createPayment(payload: { chargeId?: string | null; amount: number; paymentMethod: 'Manual' | 'MockGateway' }) {
   const response = await api.post('/payments', {
     ...payload,
     paymentMethod: paymentMethodMap[payload.paymentMethod],
@@ -320,21 +266,4 @@ export async function createUser(payload: CreateDormUserPayload) {
 
 export async function deleteUser(id: string) {
   await api.delete(`/users/${id}`)
-}
-
-export async function uploadFile(file: File, ownerModule: string, ownerEntityId?: string | null) {
-  const formData = new FormData()
-  formData.append('file', file)
-  formData.append('ownerModule', ownerModule)
-  if (ownerEntityId) {
-    formData.append('ownerEntityId', ownerEntityId)
-  }
-
-  const response = await api.post('/files/upload', formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-  })
-
-  return response.data as UploadedFile
 }

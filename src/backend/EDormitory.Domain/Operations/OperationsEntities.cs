@@ -3,16 +3,9 @@ using EDormitory.Domain.Common;
 
 namespace EDormitory.Domain.Operations;
 
-public sealed class TicketCategory : AuditableEntity
-{
-    public string CategoryName { get; set; } = string.Empty;
-    public int SlaHours { get; set; }
-}
-
 public sealed class RepairTicket : AuditableEntity
 {
-    public Guid CategoryId { get; set; }
-    public TicketCategory Category { get; set; } = null!;
+    public string Category { get; set; } = string.Empty;
     public Guid CreatedByUserId { get; set; }
     public User CreatedByUser { get; set; } = null!;
     public Guid? AssignedToUserId { get; set; }
@@ -66,17 +59,4 @@ public sealed class PassLog : AuditableEntity
     public DateTimeOffset? EntryTime { get; set; }
     public DateTimeOffset? ExitTime { get; set; }
     public string? Remarks { get; set; }
-}
-
-public sealed class FileAsset : AuditableEntity
-{
-    public string FileName { get; set; } = string.Empty;
-    public string ContentType { get; set; } = string.Empty;
-    public long Size { get; set; }
-    public string StorageKey { get; set; } = string.Empty;
-    public string Checksum { get; set; } = string.Empty;
-    public string OwnerModule { get; set; } = string.Empty;
-    public Guid? OwnerEntityId { get; set; }
-    public Guid UploadedByUserId { get; set; }
-    public User UploadedByUser { get; set; } = null!;
 }

@@ -189,7 +189,6 @@ public sealed class PaymentService(
             Amount = request.Amount,
             Currency = "UAH",
             PaymentMethod = request.PaymentMethod,
-            ReceiptFileId = request.ReceiptFileId,
             CreatedBy = currentUser.UserId,
             IdempotencyKey = Guid.NewGuid().ToString("N"),
         };
@@ -300,126 +299,12 @@ public sealed class PaymentService(
     }
 }
 
-public sealed class DirectoryService(
-    AppDbContext dbContext,
-    ICurrentUserContext currentUser,
-    IAuditService auditService) : IDirectoryService
+public sealed class DirectoryService(AppDbContext dbContext) : IDirectoryService
 {
-    public async Task<IReadOnlyCollection<TicketCategoryResponse>> GetTicketCategoriesAsync(CancellationToken cancellationToken = default)
-    {
-        var items = await dbContext.TicketCategories.OrderBy(x => x.CategoryName).ToListAsync(cancellationToken);
-        return items.Select(x => new TicketCategoryResponse(x.Id, x.CategoryName, x.SlaHours)).ToList();
-    }
-
-    public async Task<TicketCategoryResponse> CreateTicketCategoryAsync(UpsertTicketCategoryRequest request, CancellationToken cancellationToken = default)
-    {
-        EnsureRole(UserRole.Admin);
-        var category = new TicketCategory
-        {
-            CategoryName = request.CategoryName.Trim(),
-            SlaHours = request.SlaHours,
-            CreatedBy = currentUser.UserId,
-        };
-
-        dbContext.TicketCategories.Add(category);
-        await dbContext.SaveChangesAsync(cancellationToken);
-        await auditService.LogAsync(nameof(TicketCategory), category.Id, "directory.ticket-category.created", currentUser.UserId, new { category.CategoryName }, cancellationToken);
-        return new TicketCategoryResponse(category.Id, category.CategoryName, category.SlaHours);
-    }
-
     public async Task<IReadOnlyCollection<RoleDirectoryResponse>> GetRolesAsync(CancellationToken cancellationToken = default)
     {
         var roles = await dbContext.Roles.OrderBy(x => x.Name).ToListAsync(cancellationToken);
         return roles.Select(x => new RoleDirectoryResponse(x.Id, x.Name.ToString(), x.Description)).ToList();
-    }
-
-    public async Task<IReadOnlyCollection<TariffResponse>> GetTariffsAsync(CancellationToken cancellationToken = default)
-    {
-        var tariffs = await dbContext.Tariffs.OrderByDescending(x => x.IsDefault).ThenBy(x => x.Name).ToListAsync(cancellationToken);
-        return tariffs.Select(x => x.ToResponse()).ToList();
-    }
-
-    public async Task<TariffResponse> CreateTariffAsync(UpsertTariffRequest request, CancellationToken cancellationToken = default)
-    {
-        EnsureRole(UserRole.Admin);
-        if (request.IsDefault)
-        {
-            await ClearDefaultTariffsAsync(cancellationToken);
-        }
-
-        var tariff = new TariffPlan
-        {
-            Name = request.Name.Trim(),
-            MonthlyRate = request.MonthlyRate,
-            Floor = request.Floor,
-            IsDefault = request.IsDefault,
-            CreatedBy = currentUser.UserId,
-        };
-
-        dbContext.Tariffs.Add(tariff);
-        await dbContext.SaveChangesAsync(cancellationToken);
-        await auditService.LogAsync(nameof(TariffPlan), tariff.Id, "directory.tariff.created", currentUser.UserId, new { tariff.Name, tariff.MonthlyRate }, cancellationToken);
-        return tariff.ToResponse();
-    }
-
-    public async Task<TariffResponse> UpdateTariffAsync(Guid tariffId, UpsertTariffRequest request, CancellationToken cancellationToken = default)
-    {
-        EnsureRole(UserRole.Admin);
-        var tariff = await dbContext.Tariffs.FirstOrDefaultAsync(x => x.Id == tariffId, cancellationToken)
-            ?? throw new NotFoundException("Тариф не знайдено.");
-
-        if (request.IsDefault)
-        {
-            await ClearDefaultTariffsAsync(cancellationToken, tariff.Id);
-        }
-
-        tariff.Name = request.Name.Trim();
-        tariff.MonthlyRate = request.MonthlyRate;
-        tariff.Floor = request.Floor;
-        tariff.IsDefault = request.IsDefault;
-        tariff.Touch(currentUser.UserId);
-
-        await dbContext.SaveChangesAsync(cancellationToken);
-        await auditService.LogAsync(nameof(TariffPlan), tariff.Id, "directory.tariff.updated", currentUser.UserId, new { tariff.Name, tariff.MonthlyRate }, cancellationToken);
-        return tariff.ToResponse();
-    }
-
-    public async Task DeleteTariffAsync(Guid tariffId, CancellationToken cancellationToken = default)
-    {
-        EnsureRole(UserRole.Admin);
-        var tariff = await dbContext.Tariffs.FirstOrDefaultAsync(x => x.Id == tariffId, cancellationToken)
-            ?? throw new NotFoundException("РўР°СЂРёС„ РЅРµ Р·РЅР°Р№РґРµРЅРѕ.");
-
-        if (tariff.IsDefault)
-        {
-            var hasFallbackDefault = await dbContext.Tariffs.AnyAsync(x => x.Id != tariff.Id && x.IsDefault, cancellationToken);
-            if (!hasFallbackDefault)
-            {
-                throw new ConflictException("Неможливо видалити тариф за замовчуванням, доки не буде призначено інший.");
-            }
-        }
-
-        tariff.SoftDelete(currentUser.UserId);
-        await dbContext.SaveChangesAsync(cancellationToken);
-        await auditService.LogAsync(nameof(TariffPlan), tariff.Id, "directory.tariff.deleted", currentUser.UserId, new { tariff.Name }, cancellationToken);
-    }
-
-    private async Task ClearDefaultTariffsAsync(CancellationToken cancellationToken, Guid? exceptId = null)
-    {
-        var defaults = await dbContext.Tariffs.Where(x => x.IsDefault && (!exceptId.HasValue || x.Id != exceptId.Value)).ToListAsync(cancellationToken);
-        foreach (var item in defaults)
-        {
-            item.IsDefault = false;
-            item.Touch(currentUser.UserId);
-        }
-    }
-
-    private void EnsureRole(params UserRole[] roles)
-    {
-        if (!currentUser.Role.HasValue || !roles.Contains(currentUser.Role.Value))
-        {
-            throw new ForbiddenException("Недостатньо прав для цієї дії.");
-        }
     }
 }
 
@@ -431,7 +316,6 @@ public sealed class DataSeeder(
     public async Task SeedAsync(CancellationToken cancellationToken = default)
     {
         await dbContext.Database.EnsureCreatedAsync(cancellationToken);
-        await EnsureSupplementalSchemaAsync(cancellationToken);
 
         if (!await dbContext.Roles.AnyAsync(cancellationToken))
         {
@@ -454,30 +338,7 @@ public sealed class DataSeeder(
             ]);
             await dbContext.SaveChangesAsync(cancellationToken);
         }
-
-        if (!await dbContext.TicketCategories.AnyAsync(cancellationToken))
-        {
-            dbContext.TicketCategories.AddRange(
-            [
-                new TicketCategory { CategoryName = "Електрика", SlaHours = 24, CreatedAt = clock.UtcNow },
-                new TicketCategory { CategoryName = "Сантехніка", SlaHours = 12, CreatedAt = clock.UtcNow },
-                new TicketCategory { CategoryName = "Меблі", SlaHours = 48, CreatedAt = clock.UtcNow },
-            ]);
-            await dbContext.SaveChangesAsync(cancellationToken);
-        }
-
-        if (!await dbContext.Tariffs.AnyAsync(cancellationToken))
-        {
-            dbContext.Tariffs.AddRange(
-            [
-                new TariffPlan { Name = "Базовий", MonthlyRate = 3200m, Floor = 1, IsDefault = true, CreatedAt = clock.UtcNow },
-                new TariffPlan { Name = "Комфорт", MonthlyRate = 3400m, Floor = 1, IsDefault = false, CreatedAt = clock.UtcNow },
-                new TariffPlan { Name = "Стандарт+", MonthlyRate = 3000m, Floor = 2, IsDefault = false, CreatedAt = clock.UtcNow },
-            ]);
-            await dbContext.SaveChangesAsync(cancellationToken);
-        }
-
-        if (!await dbContext.Users.AnyAsync(cancellationToken))
+if (!await dbContext.Users.AnyAsync(cancellationToken))
         {
             var roles = await dbContext.Roles.ToDictionaryAsync(x => x.Name, cancellationToken);
             var rooms = await dbContext.Rooms.OrderBy(x => x.RoomNumber).ToListAsync(cancellationToken);
@@ -508,45 +369,6 @@ public sealed class DataSeeder(
             await dbContext.SaveChangesAsync(cancellationToken);
         }
     }
-
-    private async Task EnsureSupplementalSchemaAsync(CancellationToken cancellationToken)
-    {
-        await dbContext.Database.ExecuteSqlRawAsync(
-            """
-            CREATE TABLE IF NOT EXISTS "Tariffs" (
-                "Id" uuid NOT NULL,
-                "Name" character varying(120) NOT NULL,
-                "MonthlyRate" numeric(18,2) NOT NULL,
-                "Floor" integer NULL,
-                "IsDefault" boolean NOT NULL DEFAULT FALSE,
-                "CreatedAt" timestamp with time zone NOT NULL,
-                "UpdatedAt" timestamp with time zone NULL,
-                "CreatedBy" uuid NULL,
-                "UpdatedBy" uuid NULL,
-                "IsActive" boolean NOT NULL DEFAULT TRUE,
-                CONSTRAINT "PK_Tariffs" PRIMARY KEY ("Id")
-            );
-            """,
-            cancellationToken);
-
-        await dbContext.Database.ExecuteSqlRawAsync(
-            """
-            CREATE TABLE IF NOT EXISTS "NotificationStates" (
-                "Id" uuid NOT NULL,
-                "UserId" uuid NOT NULL,
-                "LastReadAt" timestamp with time zone NULL,
-                "CreatedAt" timestamp with time zone NOT NULL,
-                "UpdatedAt" timestamp with time zone NULL,
-                "CreatedBy" uuid NULL,
-                "UpdatedBy" uuid NULL,
-                "IsActive" boolean NOT NULL DEFAULT TRUE,
-                CONSTRAINT "PK_NotificationStates" PRIMARY KEY ("Id"),
-                CONSTRAINT "FK_NotificationStates_Users_UserId" FOREIGN KEY ("UserId") REFERENCES "Users" ("Id") ON DELETE RESTRICT
-            );
-            CREATE UNIQUE INDEX IF NOT EXISTS "IX_NotificationStates_UserId" ON "NotificationStates" ("UserId");
-            """,
-            cancellationToken);
-    }
 }
 
 internal static partial class MappingExtensions
@@ -566,11 +388,9 @@ internal static partial class MappingExtensions
         new(log.Id, log.PassId, log.Pass.GuestFullName, log.GuardUser.FullName, log.EntryTime, log.ExitTime, log.Remarks);
 
     public static PaymentResponse ToResponse(this Payment payment) =>
-        new(payment.Id, payment.UserId, payment.User.FullName, payment.Amount, payment.Currency, payment.PaymentMethod.ToString(), payment.TransactionStatus.ToString(), payment.ExternalReceiptId, payment.PaidAt, payment.ReceiptFileId, payment.ChargeId);
+        new(payment.Id, payment.UserId, payment.User.FullName, payment.Amount, payment.Currency, payment.PaymentMethod.ToString(), payment.TransactionStatus.ToString(), payment.ExternalReceiptId, payment.PaidAt, payment.ChargeId);
 
     public static ChargeResponse ToResponse(this StudentCharge charge) =>
         new(charge.Id, charge.Title, charge.Amount, charge.PaidAmount, charge.Currency, charge.DueDate, charge.IsSettled);
 
-    public static TariffResponse ToResponse(this TariffPlan tariff) =>
-        new(tariff.Id, tariff.Name, tariff.MonthlyRate, tariff.Floor, tariff.IsDefault);
 }

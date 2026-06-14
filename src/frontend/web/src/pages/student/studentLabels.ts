@@ -1,6 +1,8 @@
 import { LampDesk, Sofa, Wrench } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
+export const repairCategories = ['Електрика', 'Сантехніка', 'Меблі', 'Інше'] as const
+
 export function toTone(value: string): 'slate' | 'sky' | 'emerald' | 'rose' | 'amber' {
   switch (value) {
     case 'emerald':

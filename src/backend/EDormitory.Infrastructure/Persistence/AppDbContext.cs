@@ -13,19 +13,13 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<Room> Rooms => Set<Room>();
     public DbSet<RelocationRequest> RelocationRequests => Set<RelocationRequest>();
     public DbSet<Violation> Violations => Set<Violation>();
-    public DbSet<TicketCategory> TicketCategories => Set<TicketCategory>();
     public DbSet<RepairTicket> RepairTickets => Set<RepairTicket>();
     public DbSet<GuestPass> GuestPasses => Set<GuestPass>();
     public DbSet<PassLog> PassLogs => Set<PassLog>();
-    public DbSet<FileAsset> Files => Set<FileAsset>();
     public DbSet<StudentCharge> StudentCharges => Set<StudentCharge>();
-    public DbSet<TariffPlan> Tariffs => Set<TariffPlan>();
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<UserSession> UserSessions => Set<UserSession>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
-    public DbSet<NotificationState> NotificationStates => Set<NotificationState>();
-    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
-    public DbSet<SecurityEvent> SecurityEvents => Set<SecurityEvent>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -78,21 +72,14 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.HasQueryFilter(x => x.IsActive);
         });
 
-        builder.Entity<TicketCategory>(entity =>
-        {
-            entity.HasIndex(x => x.CategoryName).IsUnique();
-            entity.Property(x => x.CategoryName).HasMaxLength(120);
-            entity.HasQueryFilter(x => x.IsActive);
-        });
-
         builder.Entity<RepairTicket>(entity =>
         {
+            entity.Property(x => x.Category).HasMaxLength(120);
             entity.Property(x => x.Title).HasMaxLength(160);
             entity.Property(x => x.Description).HasMaxLength(2000);
             entity.Property(x => x.MasterNotes).HasMaxLength(1000);
             entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(32);
             entity.Property(x => x.Priority).HasConversion<string>().HasMaxLength(32);
-            entity.HasOne(x => x.Category).WithMany().HasForeignKey(x => x.CategoryId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.CreatedByUser).WithMany().HasForeignKey(x => x.CreatedByUserId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.AssignedToUser).WithMany().HasForeignKey(x => x.AssignedToUserId).OnDelete(DeleteBehavior.SetNull);
             entity.HasOne(x => x.Room).WithMany().HasForeignKey(x => x.RoomId).OnDelete(DeleteBehavior.Restrict);
@@ -118,17 +105,6 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.HasQueryFilter(x => x.IsActive);
         });
 
-        builder.Entity<FileAsset>(entity =>
-        {
-            entity.Property(x => x.FileName).HasMaxLength(255);
-            entity.Property(x => x.ContentType).HasMaxLength(120);
-            entity.Property(x => x.StorageKey).HasMaxLength(255);
-            entity.Property(x => x.Checksum).HasMaxLength(128);
-            entity.Property(x => x.OwnerModule).HasMaxLength(64);
-            entity.HasOne(x => x.UploadedByUser).WithMany().HasForeignKey(x => x.UploadedByUserId).OnDelete(DeleteBehavior.Restrict);
-            entity.HasQueryFilter(x => x.IsActive);
-        });
-
         builder.Entity<StudentCharge>(entity =>
         {
             entity.Property(x => x.Title).HasMaxLength(160);
@@ -136,13 +112,6 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(x => x.PaidAmount).HasPrecision(18, 2);
             entity.Property(x => x.Currency).HasMaxLength(8);
             entity.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
-            entity.HasQueryFilter(x => x.IsActive);
-        });
-
-        builder.Entity<TariffPlan>(entity =>
-        {
-            entity.Property(x => x.Name).HasMaxLength(120);
-            entity.Property(x => x.MonthlyRate).HasPrecision(18, 2);
             entity.HasQueryFilter(x => x.IsActive);
         });
 
@@ -178,26 +147,5 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.HasQueryFilter(x => x.IsActive);
         });
 
-        builder.Entity<NotificationState>(entity =>
-        {
-            entity.HasIndex(x => x.UserId).IsUnique();
-            entity.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
-            entity.HasQueryFilter(x => x.IsActive);
-        });
-
-        builder.Entity<AuditLog>(entity =>
-        {
-            entity.Property(x => x.EntityName).HasMaxLength(120);
-            entity.Property(x => x.Action).HasMaxLength(120);
-            entity.HasQueryFilter(x => x.IsActive);
-        });
-
-        builder.Entity<SecurityEvent>(entity =>
-        {
-            entity.Property(x => x.EventType).HasMaxLength(120);
-            entity.Property(x => x.IpAddress).HasMaxLength(64);
-            entity.Property(x => x.UserAgent).HasMaxLength(300);
-            entity.HasQueryFilter(x => x.IsActive);
-        });
     }
 }

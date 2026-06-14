@@ -65,26 +65,9 @@ export interface Ticket {
   masterNotes: string | null
   createdAt: string
   resolvedAt: string | null
-  attachmentIds: string[]
 }
 
-export interface TicketAttachment {
-  id: string
-  fileName: string
-  contentType: string
-  size: number
-  previewUrl: string
-}
-
-export interface TicketDetail extends Omit<Ticket, 'attachmentIds'> {
-  attachments: TicketAttachment[]
-}
-
-export interface TicketCategory {
-  id: string
-  categoryName: string
-  slaHours: number
-}
+export type TicketDetail = Ticket
 
 export interface GuestPass {
   id: string
@@ -127,7 +110,6 @@ export interface Payment {
   status: string
   externalReceiptId: string | null
   paidAt: string | null
-  receiptFileId: string | null
   chargeId: string | null
 }
 
@@ -179,15 +161,6 @@ export interface Violation {
   occurredAt: string
 }
 
-export interface UploadedFile {
-  id: string
-  fileName: string
-  contentType: string
-  size: number
-  ownerModule: string
-  ownerEntityId: string | null
-}
-
 export interface NotificationItem {
   id: string
   title: string
@@ -213,13 +186,4 @@ export interface CreateDormUserPayload {
   phone: string
   role: string
   roomId?: string | null
-  tariffId?: string | null
-}
-
-export interface Tariff {
-  id: string
-  name: string
-  monthlyRate: number
-  floor: number | null
-  isDefault: boolean
 }

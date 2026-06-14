@@ -14,7 +14,7 @@ public sealed class JwtOptions
     public const string SectionName = "Auth";
     public string Issuer { get; set; } = "EDormitory";
     public string Audience { get; set; } = "EDormitory.Web";
-    public string SigningKey { get; set; } = "super-secret-signing-key-change-me";
+    public string SigningKey { get; set; } = string.Empty;
     public int AccessTokenMinutes { get; set; } = 15;
     public int RefreshTokenDays { get; set; } = 7;
     public int SessionIdleMinutes { get; set; } = 60;

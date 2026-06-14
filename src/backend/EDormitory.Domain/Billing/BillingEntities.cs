@@ -22,14 +22,6 @@ public sealed class StudentCharge : AuditableEntity
     }
 }
 
-public sealed class TariffPlan : AuditableEntity
-{
-    public string Name { get; set; } = string.Empty;
-    public decimal MonthlyRate { get; set; }
-    public int? Floor { get; set; }
-    public bool IsDefault { get; set; }
-}
-
 public sealed class Payment : AuditableEntity
 {
     public Guid UserId { get; set; }
@@ -43,7 +35,6 @@ public sealed class Payment : AuditableEntity
     public DateTimeOffset? PaidAt { get; set; }
     public PaymentStatus TransactionStatus { get; set; } = PaymentStatus.Pending;
     public string? ProviderReference { get; set; }
-    public Guid? ReceiptFileId { get; set; }
     public string? IdempotencyKey { get; set; }
 
     public void Confirm(string? externalReceiptId, Guid? userId = null)
@@ -53,22 +44,4 @@ public sealed class Payment : AuditableEntity
         PaidAt = DateTimeOffset.UtcNow;
         Touch(userId);
     }
-}
-
-public sealed class AuditLog : AuditableEntity
-{
-    public string EntityName { get; set; } = string.Empty;
-    public Guid? EntityId { get; set; }
-    public string Action { get; set; } = string.Empty;
-    public Guid? UserId { get; set; }
-    public string PayloadJson { get; set; } = string.Empty;
-}
-
-public sealed class SecurityEvent : AuditableEntity
-{
-    public Guid? UserId { get; set; }
-    public string EventType { get; set; } = string.Empty;
-    public string Details { get; set; } = string.Empty;
-    public string? IpAddress { get; set; }
-    public string? UserAgent { get; set; }
 }

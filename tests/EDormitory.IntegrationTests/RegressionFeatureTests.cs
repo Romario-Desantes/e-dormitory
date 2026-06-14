@@ -1,9 +1,11 @@
 using System.Net;
 using System.Net.Http.Json;
-using EDormitory.Application.Contracts.Directories;
 using EDormitory.Application.Contracts.Notifications;
 using EDormitory.Application.Contracts.Rooms;
 using EDormitory.Application.Contracts.Users;
+using EDormitory.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace EDormitory.IntegrationTests;
 
@@ -104,25 +106,53 @@ public sealed class RegressionFeatureTests(TestWebApplicationFactory factory) : 
 
         Assert.Equal(HttpStatusCode.Forbidden, loginResponse.StatusCode);
     }
-
     [Fact]
-    public async Task DeleteTariff_Should_Remove_It_From_Active_List()
+    public async Task EnsureCreated_Should_Create_Only_The_12_Normalized_Tables()
     {
         await factory.ResetDatabaseAsync();
-        var adminClient = await factory.CreateAuthenticatedClientAsync("admin@edormitory.local");
-        var initialTariffs = await GetTariffsAsync(adminClient);
-        var targetTariff = initialTariffs.Single(tariff => string.Equals(tariff.Name, "Комфорт", StringComparison.Ordinal));
 
-        var deleteResponse = await adminClient.DeleteAsync($"/api/directories/tariffs/{targetTariff.Id}");
+        using var scope = factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var connection = dbContext.Database.GetDbConnection();
 
-        Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
+        if (connection.State != System.Data.ConnectionState.Open)
+        {
+            await connection.OpenAsync();
+        }
 
-        var tariffsAfterDelete = await GetTariffsAsync(adminClient);
-        Assert.DoesNotContain(tariffsAfterDelete, tariff => tariff.Id == targetTariff.Id);
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT name
+            FROM sqlite_master
+            WHERE type = 'table' AND name NOT LIKE 'sqlite_%'
+            ORDER BY name;
+            """;
+
+        var tables = new List<string>();
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            tables.Add(reader.GetString(0));
+        }
+
+        Assert.Equal(
+        [
+            "GuestPasses",
+            "PassLogs",
+            "Payments",
+            "RefreshTokens",
+            "RelocationRequests",
+            "RepairTickets",
+            "Roles",
+            "Rooms",
+            "StudentCharges",
+            "UserSessions",
+            "Users",
+            "Violations",
+        ], tables);
     }
-
     [Fact]
-    public async Task Violation_Should_Create_Unread_Notification_And_Mark_Read_Should_Clear_It()
+    public async Task Violation_Should_Appear_In_Dynamic_Notification_Feed()
     {
         await factory.ResetDatabaseAsync();
         var adminClient = await factory.CreateAuthenticatedClientAsync("admin@edormitory.local");
@@ -152,7 +182,8 @@ public sealed class RegressionFeatureTests(TestWebApplicationFactory factory) : 
         Assert.Equal(HttpStatusCode.NoContent, markReadResponse.StatusCode);
 
         var readFeed = await GetNotificationFeedAsync(studentClient);
-        Assert.Equal(0, readFeed.UnreadCount);
+        Assert.Equal(1, readFeed.UnreadCount);
+        Assert.Contains(readFeed.Items, item => string.Equals(item.Description, violationDescription, StringComparison.Ordinal));
     }
 
     private static async Task<List<RoomResponse>> GetRoomsAsync(HttpClient client) =>
@@ -166,9 +197,6 @@ public sealed class RegressionFeatureTests(TestWebApplicationFactory factory) : 
 
     private static async Task<List<UserResponse>> GetUsersAsync(HttpClient client) =>
         await client.GetFromJsonAsync<List<UserResponse>>("/api/users") ?? [];
-
-    private static async Task<List<TariffResponse>> GetTariffsAsync(HttpClient client) =>
-        await client.GetFromJsonAsync<List<TariffResponse>>("/api/directories/tariffs") ?? [];
 
     private static async Task<List<EDormitory.Application.Contracts.Payments.ChargeResponse>> GetChargesAsync(HttpClient client) =>
         await client.GetFromJsonAsync<List<EDormitory.Application.Contracts.Payments.ChargeResponse>>("/api/payments/charges") ?? [];
@@ -192,8 +220,8 @@ public sealed class RegressionFeatureTests(TestWebApplicationFactory factory) : 
             $"student-{suffix}@edormitory.local",
             $"+38099{Math.Abs(suffix.GetHashCode() % 10_000_000):0000000}",
             "Student",
-            roomId,
-            null);
+            roomId);
 
     private sealed record ApiError(string Title, int Status, string Detail);
 }
+

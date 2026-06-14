@@ -288,12 +288,7 @@ public sealed class TicketService(
         var ticket = await query.FirstOrDefaultAsync(x => x.Id == ticketId, cancellationToken)
             ?? throw new NotFoundException("Р—Р°СЏРІРєСѓ РЅРµ Р·РЅР°Р№РґРµРЅРѕ.");
 
-        var attachments = await dbContext.Files
-            .Where(x => x.OwnerModule == "tickets" && x.OwnerEntityId == ticket.Id)
-            .OrderBy(x => x.CreatedAt)
-            .ToListAsync(cancellationToken);
-
-        return ticket.ToDetail(currentUser.Role!.Value, attachments);
+        return ticket.ToDetail(currentUser.Role!.Value);
     }
 
     public async Task<TicketResponse> CreateTicketAsync(CreateTicketRequest request, CancellationToken cancellationToken = default)
@@ -305,12 +300,9 @@ public sealed class TicketService(
             throw new ConflictException("РџРѕС‚СЂС–Р±РЅРѕ Р±СѓС‚Рё Р·Р°РєСЂС–РїР»РµРЅРёРј Р·Р° РєС–РјРЅР°С‚РѕСЋ, С‰РѕР± СЃС‚РІРѕСЂРёС‚Рё Р·Р°СЏРІРєСѓ.");
         }
 
-        _ = await dbContext.TicketCategories.FirstOrDefaultAsync(x => x.Id == request.CategoryId, cancellationToken)
-            ?? throw new NotFoundException("РљР°С‚РµРіРѕСЂС–СЋ РЅРµ Р·РЅР°Р№РґРµРЅРѕ.");
-
         var ticket = new RepairTicket
         {
-            CategoryId = request.CategoryId,
+            Category = request.Category.Trim(),
             CreatedByUserId = user.Id,
             RoomId = user.RoomId.Value,
             Title = request.Title.Trim(),
@@ -321,19 +313,6 @@ public sealed class TicketService(
 
         dbContext.RepairTickets.Add(ticket);
         await dbContext.SaveChangesAsync(cancellationToken);
-
-        if (request.AttachmentIds is { Count: > 0 })
-        {
-            var attachments = await dbContext.Files.Where(x => request.AttachmentIds.Contains(x.Id)).ToListAsync(cancellationToken);
-            foreach (var file in attachments)
-            {
-                file.OwnerModule = "tickets";
-                file.OwnerEntityId = ticket.Id;
-                file.Touch(currentUser.UserId);
-            }
-
-            await dbContext.SaveChangesAsync(cancellationToken);
-        }
 
         await auditService.LogAsync(nameof(RepairTicket), ticket.Id, "ticket.created", currentUser.UserId, new { ticket.Title }, cancellationToken);
         return await GetTicketByIdAsync(ticket.Id, currentUser.Role!.Value, cancellationToken);
@@ -369,7 +348,6 @@ public sealed class TicketService(
     private IQueryable<RepairTicket> BuildTicketQuery()
     {
         var query = dbContext.RepairTickets
-            .Include(x => x.Category)
             .Include(x => x.Room)
             .Include(x => x.CreatedByUser)
             .Include(x => x.AssignedToUser)
@@ -435,7 +413,7 @@ internal static partial class MappingExtensions
             ticket.Id,
             ticket.Title,
             ticket.Description,
-            ticket.Category.CategoryName,
+            ticket.Category,
             ticket.Room.RoomNumber,
             ticket.Status.ToString(),
             ticket.Priority.ToString(),
@@ -444,15 +422,14 @@ internal static partial class MappingExtensions
             ticket.AssignedToUser?.FullName,
             ticket.MasterNotes,
             ticket.CreatedAt,
-            ticket.ResolvedAt,
-            []);
+            ticket.ResolvedAt);
 
-    public static TicketDetailResponse ToDetail(this RepairTicket ticket, UserRole role, IReadOnlyCollection<FileAsset> attachments) =>
+    public static TicketDetailResponse ToDetail(this RepairTicket ticket, UserRole role) =>
         new(
             ticket.Id,
             ticket.Title,
             ticket.Description,
-            ticket.Category.CategoryName,
+            ticket.Category,
             ticket.Room.RoomNumber,
             ticket.Status.ToString(),
             ticket.Priority.ToString(),
@@ -461,12 +438,5 @@ internal static partial class MappingExtensions
             ticket.AssignedToUser?.FullName,
             ticket.MasterNotes,
             ticket.CreatedAt,
-            ticket.ResolvedAt,
-            attachments.Select(file => new TicketAttachmentResponse(
-                file.Id,
-                file.FileName,
-                file.ContentType,
-                file.Size,
-                $"/api/files/{file.Id}/content"))
-            .ToList());
+            ticket.ResolvedAt);
 }

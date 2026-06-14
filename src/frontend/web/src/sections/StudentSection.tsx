@@ -3,18 +3,18 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { lazy, Suspense, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
-import { createPass, createPayment, createRelocation, createTicket, getCharges, getPasses, getPayments, getRelocations, getRooms, getTicketCategories, getTickets, uploadFile } from '../lib/api'
+import { createPass, createPayment, createRelocation, createTicket, getCharges, getPasses, getPayments, getRelocations, getRooms, getTickets } from '../lib/api'
 import { Card, SectionFrame, SimpleTable, SubmitButton } from './ui'
 import { formatDate, formatMoney, inputClass, toInputDateTime } from './utils'
 
 const StudentPassCards = lazy(() => import('./StudentPassCards').then((module) => ({ default: module.StudentPassCards })))
+const repairCategories = ['Електрика', 'Сантехніка', 'Меблі', 'Інше']
 
 const ticketSchema = z.object({
-  categoryId: z.string().min(1),
+  category: z.string().min(1),
   title: z.string().min(3).max(160),
   description: z.string().min(10).max(2000),
   priority: z.enum(['Low', 'Medium', 'High', 'Critical']),
-  attachment: z.any().optional(),
 })
 
 const passSchema = z.object({
@@ -33,7 +33,6 @@ const paymentSchema = z.object({
   chargeId: z.string().optional(),
   amount: z.coerce.number().positive(),
   paymentMethod: z.enum(['Manual', 'MockGateway']),
-  receipt: z.any().optional(),
 })
 
 type TicketFormValues = z.infer<typeof ticketSchema>
@@ -49,35 +48,23 @@ export function StudentSection({ isAdminView = false }: { isAdminView?: boolean 
     validFrom: toInputDateTime(new Date()),
     validTo: toInputDateTime(new Date(Date.now() + 3 * 60 * 60 * 1000)),
   }))
+
   const roomsQuery = useQuery({ queryKey: ['rooms'], queryFn: getRooms })
-  const categoriesQuery = useQuery({ queryKey: ['categories'], queryFn: getTicketCategories })
   const ticketsQuery = useQuery({ queryKey: ['tickets'], queryFn: getTickets })
   const passesQuery = useQuery({ queryKey: ['passes'], queryFn: getPasses })
   const chargesQuery = useQuery({ queryKey: ['charges'], queryFn: getCharges })
   const paymentsQuery = useQuery({ queryKey: ['payments'], queryFn: getPayments })
   const relocationsQuery = useQuery({ queryKey: ['relocations'], queryFn: getRelocations })
 
-  const ticketForm = useForm<TicketFormValues>({ resolver: zodResolver(ticketSchema), defaultValues: { priority: 'Medium' } })
-  const passForm = useForm<PassFormValues>({
-    resolver: zodResolver(passSchema),
-    defaultValues: defaultPassDates,
-  })
+  const ticketForm = useForm<TicketFormValues>({ resolver: zodResolver(ticketSchema), defaultValues: { priority: 'Medium', category: '' } })
+  const passForm = useForm<PassFormValues>({ resolver: zodResolver(passSchema), defaultValues: defaultPassDates })
   const relocationForm = useForm<RelocationFormValues>({ resolver: zodResolver(relocationSchema) })
   const paymentForm = useForm<PaymentFormInput, unknown, PaymentFormValues>({ resolver: zodResolver(paymentSchema), defaultValues: { paymentMethod: 'Manual' } })
 
   const createTicketMutation = useMutation({
-    mutationFn: async (values: TicketFormValues) => {
-      const file = values.attachment?.[0] as File | undefined
-      let attachmentIds: string[] | undefined
-      if (file) {
-        const uploaded = await uploadFile(file, 'tickets')
-        attachmentIds = [uploaded.id]
-      }
-
-      return createTicket({ categoryId: values.categoryId, title: values.title, description: values.description, priority: values.priority, attachmentIds })
-    },
+    mutationFn: (values: TicketFormValues) => createTicket(values),
     onSuccess: async () => {
-      ticketForm.reset({ priority: 'Medium' })
+      ticketForm.reset({ priority: 'Medium', category: '' })
       setNotice('Заявку на ремонт створено.')
       await queryClient.invalidateQueries({ queryKey: ['tickets'] })
     },
@@ -107,16 +94,7 @@ export function StudentSection({ isAdminView = false }: { isAdminView?: boolean 
   })
 
   const createPaymentMutation = useMutation({
-    mutationFn: async (values: PaymentFormValues) => {
-      const receipt = values.receipt?.[0] as File | undefined
-      let receiptFileId: string | undefined
-      if (receipt) {
-        const uploaded = await uploadFile(receipt, 'payments')
-        receiptFileId = uploaded.id
-      }
-
-      return createPayment({ chargeId: values.chargeId || undefined, amount: values.amount, paymentMethod: values.paymentMethod, receiptFileId })
-    },
+    mutationFn: (values: PaymentFormValues) => createPayment({ chargeId: values.chargeId || undefined, amount: values.amount, paymentMethod: values.paymentMethod }),
     onSuccess: async () => {
       paymentForm.reset({ paymentMethod: 'Manual' })
       setNotice('Платіж створено.')
@@ -132,24 +110,21 @@ export function StudentSection({ isAdminView = false }: { isAdminView?: boolean 
       {notice ? <div className="mb-6 rounded-[1.5rem] border border-emerald-300 bg-emerald-50 px-5 py-4 text-emerald-900">{notice}</div> : null}
 
       <div className="grid gap-6 xl:grid-cols-2">
-        <Card title="Створити заявку на ремонт" subtitle="Не більше 4 кліків до збереження заявки.">
+        <Card title="Створити заявку на ремонт" subtitle="Категорія зберігається прямо у заявці без окремого довідника.">
           <form className="grid gap-4" onSubmit={ticketForm.handleSubmit((values) => createTicketMutation.mutate(values))}>
-            <select className={inputClass} {...ticketForm.register('categoryId')}>
+            <select className={inputClass} {...ticketForm.register('category')}>
               <option value="">Оберіть категорію</option>
-              {categoriesQuery.data?.map((category) => (
-                <option key={category.id} value={category.id}>{category.categoryName} · SLA {category.slaHours} год</option>
+              {repairCategories.map((category) => (
+                <option key={category} value={category}>{category}</option>
               ))}
             </select>
             <input className={inputClass} placeholder="Короткий заголовок проблеми" {...ticketForm.register('title')} />
             <textarea className={inputClass} rows={4} placeholder="Що саме сталося і де?" {...ticketForm.register('description')} />
-            <div className="grid gap-4 sm:grid-cols-2">
-              <select className={inputClass} {...ticketForm.register('priority')}>
-                {['Low', 'Medium', 'High', 'Critical'].map((priority) => (
-                  <option key={priority} value={priority}>{priority}</option>
-                ))}
-              </select>
-              <input className={inputClass} type="file" accept="image/*" {...ticketForm.register('attachment')} />
-            </div>
+            <select className={inputClass} {...ticketForm.register('priority')}>
+              {['Low', 'Medium', 'High', 'Critical'].map((priority) => (
+                <option key={priority} value={priority}>{priority}</option>
+              ))}
+            </select>
             <SubmitButton pending={createTicketMutation.isPending} label="Надіслати заявку" />
           </form>
         </Card>
@@ -179,7 +154,7 @@ export function StudentSection({ isAdminView = false }: { isAdminView?: boolean 
           </form>
         </Card>
 
-        <Card title="Створити платіж" subtitle="Підтримано ручне підтвердження та mock provider abstraction.">
+        <Card title="Створити платіж" subtitle="Платіж пов’язується з нарахуванням без квитанції-файлу.">
           <form className="grid gap-4" onSubmit={paymentForm.handleSubmit((values) => createPaymentMutation.mutate(values))}>
             <select className={inputClass} {...paymentForm.register('chargeId')}>
               <option value="">Без прив'язки до нарахування</option>
@@ -194,18 +169,17 @@ export function StudentSection({ isAdminView = false }: { isAdminView?: boolean 
                 <option value="MockGateway">MockGateway</option>
               </select>
             </div>
-            <input className={inputClass} type="file" accept="image/*,application/pdf" {...paymentForm.register('receipt')} />
             <SubmitButton pending={createPaymentMutation.isPending} label="Створити платіж" />
           </form>
         </Card>
       </div>
 
       <div className="mt-6 grid gap-6 xl:grid-cols-2">
-        <Card title="Мої заявки" subtitle="Видно лише заявки, створені поточним користувачем.">
+        <Card title="Мої заявки" subtitle="Видно заявки, доступні поточній ролі.">
           <SimpleTable headers={['Назва', 'Категорія', 'Кімната', 'Статус', 'Створено']} rows={(ticketsQuery.data ?? []).map((ticket) => [ticket.title, ticket.category, ticket.roomNumber, ticket.status, formatDate(ticket.createdAt)])} />
         </Card>
 
-        <Card title="Мої перепустки" subtitle="QR-код можна показати охороні прямо з телефону.">
+        <Card title="Мої перепустки" subtitle="QR-код можна показати охороні з телефону.">
           <Suspense fallback={<div className="text-sm text-slate-500">Завантажуємо QR-картки...</div>}>
             <StudentPassCards passes={passesQuery.data ?? []} />
           </Suspense>
@@ -217,7 +191,7 @@ export function StudentSection({ isAdminView = false }: { isAdminView?: boolean 
           <SimpleTable headers={['Нарахування', 'Сума', 'Сплачено', 'Строк', 'Статус']} rows={(chargesQuery.data ?? []).map((charge) => [charge.title, formatMoney(charge.amount), formatMoney(charge.paidAmount), formatDate(charge.dueDate), charge.isSettled ? 'Сплачено' : 'Очікує'])} />
         </Card>
 
-        <Card title="Історія платежів" subtitle="Manual confirm та mock gateway відображаються в єдиному списку.">
+        <Card title="Історія платежів" subtitle="Manual confirm та mock gateway відображаються в одному списку.">
           <SimpleTable headers={['Сума', 'Метод', 'Статус', 'Квитанція', 'Дата']} rows={(paymentsQuery.data ?? []).map((payment) => [formatMoney(payment.amount), payment.paymentMethod, payment.status, payment.externalReceiptId ?? '—', payment.paidAt ? formatDate(payment.paidAt) : 'Очікує'])} />
         </Card>
       </div>

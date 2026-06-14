@@ -9,7 +9,6 @@ import type {
 } from 'react'
 
 export function PageSection({
-  eyebrow,
   title,
   description,
   actions,
@@ -25,11 +24,6 @@ export function PageSection({
     <section className="space-y-5 sm:space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="space-y-2">
-          {eyebrow ? (
-            <p className="text-xs font-semibold uppercase tracking-[0.34em] text-[var(--color-accent)]">
-              {eyebrow}
-            </p>
-          ) : null}
           <h1 className="font-display text-3xl leading-none text-slate-950 sm:text-4xl">{title}</h1>
           {description ? (
             <p className="max-w-3xl text-sm leading-6 text-slate-600 sm:text-base">{description}</p>

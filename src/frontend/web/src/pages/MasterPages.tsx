@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Eye, SquareCheckBig, Wrench } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { z } from 'zod'
@@ -27,22 +27,20 @@ const ticketNotesSchema = z.object({
 type TicketNotesFormValues = z.infer<typeof ticketNotesSchema>
 type BoardStatus = 'New' | 'InProgress' | 'Completed'
 
+const boardColumns: Array<{ id: BoardStatus; label: string }> = [
+  { id: 'New', label: 'Нове' },
+  { id: 'InProgress', label: 'В роботі' },
+  { id: 'Completed', label: 'Завершено' },
+]
+
 export function MasterTasksPage() {
-  const queryClient = useQueryClient()
   const ticketsQuery = useQuery({ queryKey: ['tickets'], queryFn: getTickets })
+  const queryClient = useQueryClient()
   const [draggedTicketId, setDraggedTicketId] = useState<string | null>(null)
   const [pendingComplete, setPendingComplete] = useState<{ id: string; title: string } | null>(null)
   const [completeComment, setCompleteComment] = useState('')
 
   const tickets = ticketsQuery.data ?? []
-  const columns = useMemo(
-    () => [
-      { id: 'New' as const, label: 'Нові' },
-      { id: 'InProgress' as const, label: 'В процесі' },
-      { id: 'Completed' as const, label: 'Завершено' },
-    ],
-    [],
-  )
 
   const updateMutation = useMutation({
     mutationFn: ({
@@ -90,40 +88,41 @@ export function MasterTasksPage() {
       status: 'Completed',
       masterNotes: completeComment.trim() || undefined,
     })
+
     setPendingComplete(null)
     setCompleteComment('')
   }
 
   return (
     <PageSection
-      eyebrow="Ремонти"
-      title="Що треба полагодити"
-      description="Перетягуйте картки між колонками, щоб команда бачила актуальний стан роботи."
+      eyebrow="Ремонтні заявки"
+      title="Що треба полагодити?"
+      description="Перетягуйте картки між колонками, щоб команда бачила поточний стан робіт."
     >
       {tickets.length === 0 ? (
         <EmptyState
           title="Поки все спокійно"
-          description="Нові прохання від мешканців з’являться тут, щойно їх створять."
+          description="Нові звернення від мешканців з'являться тут, щойно їх створять."
         />
       ) : (
         <div className="grid gap-5 lg:grid-cols-3">
-          {columns.map((column) => (
-            <SurfaceCard
-              key={column.id}
-              className="bg-[var(--color-panel-soft)]"
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={() => handleDrop(column.id)}
-            >
-              <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-xl font-semibold text-slate-950">{column.label}</h2>
-                <Badge tone={statusTone(column.id)}>
-                  {tickets.filter((ticket) => ticket.status === column.id).length}
-                </Badge>
-              </div>
-              <div className="grid gap-4">
-                {tickets
-                  .filter((ticket) => ticket.status === column.id)
-                  .map((ticket) => (
+          {boardColumns.map((column) => {
+            const columnTickets = tickets.filter((ticket) => ticket.status === column.id)
+
+            return (
+              <SurfaceCard
+                key={column.id}
+                className="bg-[var(--color-panel-soft)]"
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={() => handleDrop(column.id)}
+              >
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <h2 className="text-xl font-semibold text-slate-950">{column.label}</h2>
+                  <Badge tone={statusTone(column.id)}>{columnTickets.length}</Badge>
+                </div>
+
+                <div className="grid gap-4">
+                  {columnTickets.map((ticket) => (
                     <Link
                       key={ticket.id}
                       to={`/app/tasks/${ticket.id}`}
@@ -137,24 +136,32 @@ export function MasterTasksPage() {
                             Кімната {ticket.roomNumber}
                           </p>
                           <h3 className="mt-2 text-lg font-semibold text-slate-950">{ticket.title}</h3>
+                          <p className="mt-1 text-sm text-slate-500">{ticket.category}</p>
                         </div>
                         <Badge tone={priorityTone(ticket.priority)}>{priorityLabel(ticket.priority)}</Badge>
                       </div>
+
                       <p className="mt-3 text-sm leading-6 text-slate-600">{ticket.description}</p>
                     </Link>
                   ))}
-              </div>
-            </SurfaceCard>
-          ))}
+                </div>
+              </SurfaceCard>
+            )
+          })}
         </div>
       )}
 
       <Modal open={Boolean(pendingComplete)} onClose={() => setPendingComplete(null)} title="Що зробили?">
         <div className="grid gap-4">
           <p className="text-sm text-slate-600">
-            Додайте короткий коментар, щоб мешканець побачив результат роботи.
+            Додайте короткий коментар, щоб мешканець бачив, як саме закрили заявку.
           </p>
-          <TextArea rows={6} value={completeComment} onChange={(event) => setCompleteComment(event.target.value)} placeholder="Наприклад: замінили змішувач і перевірили підтікання." />
+          <TextArea
+            rows={6}
+            value={completeComment}
+            onChange={(event) => setCompleteComment(event.target.value)}
+            placeholder="Наприклад: замінили змішувач і перевірили підтікання."
+          />
           <div className="flex justify-end gap-3">
             <SecondaryButton onClick={() => setPendingComplete(null)}>Скасувати</SecondaryButton>
             <PrimaryButton onClick={completeTicket} disabled={updateMutation.isPending}>
@@ -186,9 +193,9 @@ export function MasterTaskDetailPage() {
   })
 
   useEffect(() => {
-    if (ticketQuery.data?.masterNotes) {
-      form.setValue('masterNotes', ticketQuery.data.masterNotes)
-    }
+    form.reset({ masterNotes: ticketQuery.data?.masterNotes ?? '' })
+    const timer = window.setTimeout(() => setPhoneVisible(false), 0)
+    return () => window.clearTimeout(timer)
   }, [form, ticketQuery.data?.masterNotes])
 
   const updateMutation = useMutation({
@@ -209,12 +216,21 @@ export function MasterTaskDetailPage() {
 
   const ticket = ticketQuery.data
 
+  const submitNotes = form.handleSubmit((values) =>
+    updateMutation.mutate({ status: 'Completed', masterNotes: values.masterNotes?.trim() || undefined }),
+  )
+
   return (
     <PageSection
       eyebrow="Прохання"
-      title={ticket?.title ?? 'Деталі'}
-      description={ticket ? `Кімната ${ticket.roomNumber}` : 'Завантажуємо деталі.'}
-      actions={<SecondaryButton onClick={() => navigate('/app/tasks')}><ArrowLeft className="mr-2 h-4 w-4" />Назад</SecondaryButton>}
+      title={ticket?.title ?? 'Деталі заявки'}
+      description={ticket ? `Кімната ${ticket.roomNumber}` : 'Завантажуємо деталі заявки.'}
+      actions={
+        <SecondaryButton onClick={() => navigate('/app/tasks')}>
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Назад
+        </SecondaryButton>
+      }
     >
       {ticket ? (
         <div className="grid gap-5 lg:grid-cols-[1.15fr_0.85fr]">
@@ -223,36 +239,26 @@ export function MasterTaskDetailPage() {
               <p className="text-base leading-7 text-slate-700">{ticket.description}</p>
             </SurfaceCard>
 
-            {(ticket.attachments ?? []).length > 0 ? (
-              <div className="grid gap-4 md:grid-cols-2">
-                {ticket.attachments.map((attachment) => (
-                  <SurfaceCard key={attachment.id} className="overflow-hidden p-0">
-                    {attachment.contentType.startsWith('image/') ? (
-                      <img src={attachment.previewUrl} alt={attachment.fileName} className="h-56 w-full object-cover" />
-                    ) : (
-                      <div className="flex h-56 items-center justify-center bg-slate-100 text-slate-500">{attachment.fileName}</div>
-                    )}
-                  </SurfaceCard>
-                ))}
-              </div>
-            ) : (
-          <EmptyState title="Фото немає" description="Студент не додав фото, тож орієнтуйтеся на опис." />
-            )}
-          </div>
-
-          <div className="space-y-5">
             <SurfaceCard>
               <div className="flex items-center gap-3">
                 <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-100 text-sky-700">
                   <Wrench className="h-6 w-6" />
                 </span>
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Деталі прохання</p>
-                  <h2 className="text-2xl font-semibold text-slate-950">Деталі</h2>
+                  <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
+                    Деталі заявки
+                  </p>
+                  <h2 className="text-2xl font-semibold text-slate-950">Загальна інформація</h2>
                 </div>
               </div>
+
               <div className="mt-5 grid gap-3">
+                <DetailRow
+                  label="Статус"
+                  value={<Badge tone={statusTone(ticket.status as BoardStatus)}>{statusLabel(ticket.status)}</Badge>}
+                />
                 <DetailRow label="Пріоритет" value={<Badge tone={priorityTone(ticket.priority)}>{priorityLabel(ticket.priority)}</Badge>} />
+                <DetailRow label="Категорія" value={ticket.category} />
                 <DetailRow label="Створено" value={formatDate(ticket.createdAt)} />
                 <DetailRow label="Мешканець" value={ticket.createdBy} />
                 <DetailRow
@@ -262,7 +268,11 @@ export function MasterTaskDetailPage() {
                       phoneVisible ? (
                         ticket.contactPhone
                       ) : (
-                        <button type="button" className="inline-flex items-center gap-2 rounded-full border border-slate-300 px-3 py-1 text-sm font-semibold text-slate-700" onClick={() => setPhoneVisible(true)}>
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-2 rounded-full border border-slate-300 px-3 py-1 text-sm font-semibold text-slate-700"
+                          onClick={() => setPhoneVisible(true)}
+                        >
                           <Eye className="h-4 w-4" />
                           Показати номер
                         </button>
@@ -274,14 +284,25 @@ export function MasterTaskDetailPage() {
                 />
               </div>
             </SurfaceCard>
+          </div>
 
+          <div className="space-y-5">
             <SurfaceCard>
-              <form className="grid gap-4" onSubmit={form.handleSubmit((values) => updateMutation.mutate({ status: 'Completed', masterNotes: values.masterNotes }))}>
-                <TextField label="Коментар">
+              <form className="grid gap-4" onSubmit={submitNotes}>
+                <TextField label="Коментар майстра">
                   <TextArea rows={6} placeholder="Що саме зробили?" {...form.register('masterNotes')} />
                 </TextField>
+
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <SecondaryButton type="button" onClick={() => updateMutation.mutate({ status: 'InProgress', masterNotes: form.getValues('masterNotes') })}>
+                  <SecondaryButton
+                    type="button"
+                    onClick={() =>
+                      updateMutation.mutate({
+                        status: 'InProgress',
+                        masterNotes: form.getValues('masterNotes')?.trim() || undefined,
+                      })
+                    }
+                  >
                     Взяти в роботу
                   </SecondaryButton>
                   <PrimaryButton type="submit" className="bg-emerald-600 hover:bg-emerald-500">
@@ -294,7 +315,10 @@ export function MasterTaskDetailPage() {
           </div>
         </div>
       ) : (
-      <EmptyState title="Не знайшли це прохання" description="Можливо, його вже закрили або воно більше недоступне." />
+        <EmptyState
+          title="Не знайшли цю заявку"
+          description="Можливо, її вже закрили або вона стала недоступною."
+        />
       )}
     </PageSection>
   )
@@ -319,6 +343,19 @@ function statusTone(status: BoardStatus): 'slate' | 'sky' | 'emerald' | 'rose' |
   }
 
   return 'amber'
+}
+
+function statusLabel(status: string) {
+  switch (status) {
+    case 'New':
+      return 'Нове'
+    case 'InProgress':
+      return 'В роботі'
+    case 'Completed':
+      return 'Завершено'
+    default:
+      return status
+  }
 }
 
 function priorityTone(priority: string): 'slate' | 'sky' | 'emerald' | 'rose' | 'amber' {

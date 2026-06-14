@@ -245,9 +245,7 @@ public sealed class UserService(
         var roleValue = Enum.Parse<UserRole>(request.Role, true);
         var role = await dbContext.Roles.FirstAsync(x => x.Name == roleValue, cancellationToken);
         Room? room = null;
-        TariffPlan? tariff = null;
-
-        if (roleValue != UserRole.Student && (request.RoomId.HasValue || request.TariffId.HasValue))
+        if (roleValue != UserRole.Student && request.RoomId.HasValue)
         {
             throw new ConflictException("Кімнату та тариф можна призначати лише студентам.");
         }
@@ -262,13 +260,7 @@ public sealed class UserService(
             EnsureRoomCanHostStudent(room);
         }
 
-        if (roleValue == UserRole.Student && request.TariffId.HasValue)
-        {
-            tariff = await dbContext.Tariffs.FirstOrDefaultAsync(x => x.Id == request.TariffId.Value, cancellationToken)
-                ?? throw new NotFoundException("РўР°СЂРёС„ РЅРµ Р·РЅР°Р№РґРµРЅРѕ.");
-        }
-
-        var initialChargeAmount = tariff?.MonthlyRate ?? room?.MonthlyRate ?? 0m;
+        var initialChargeAmount = room?.MonthlyRate ?? 0m;
 
         var user = new User
         {

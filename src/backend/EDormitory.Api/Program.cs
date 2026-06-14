@@ -71,6 +71,11 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
         var authOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
+        if (string.IsNullOrWhiteSpace(authOptions.SigningKey))
+        {
+            throw new InvalidOperationException("Configuration value 'Auth:SigningKey' is required.");
+        }
+
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,

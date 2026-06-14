@@ -2,49 +2,35 @@ services:
   postgres:
     image: postgres:16
     environment:
-      POSTGRES_DB: edormitory
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_HOST_PORT}:${POSTGRES_CONTAINER_PORT}"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d edormitory"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 12
     volumes:
       - postgres-data:/var/lib/postgresql/data
 
-  minio:
-    image: minio/minio:RELEASE.2025-01-20T14-49-07Z
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    volumes:
-      - minio-data:/data
-
   api:
     build:
       context: ..
       dockerfile: infrastructure/Dockerfile.api
     environment:
-      ASPNETCORE_ENVIRONMENT: Development
-      ASPNETCORE_URLS: http://+:8080
-      ConnectionStrings__Postgres: Host=postgres;Port=5432;Database=edormitory;Username=postgres;Password=postgres
-      Auth__Issuer: EDormitory
-      Auth__Audience: EDormitory.Web
-      Auth__SigningKey: edormitory-docker-signing-key-2026
-      Storage__Provider: Disk
-      Storage__RootPath: /app/storage
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT}
+      ASPNETCORE_URLS: ${ASPNETCORE_URLS}
+      ConnectionStrings__Postgres: "Host=${POSTGRES_HOST};Port=${POSTGRES_CONTAINER_PORT};Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
+      Auth__Issuer: ${AUTH_ISSUER}
+      Auth__Audience: ${AUTH_AUDIENCE}
+      Auth__SigningKey: ${AUTH_SIGNING_KEY}
+      Storage__Provider: ${STORAGE_PROVIDER}
+      Storage__RootPath: ${STORAGE_ROOT_PATH}
     depends_on:
       postgres:
         condition: service_healthy
-      minio:
-        condition: service_started
     ports:
       - "8080:8080"
     volumes:
@@ -58,17 +44,16 @@ services:
     depends_on:
       - api
     ports:
-      - "3000:5173"
+      - "${WEB_HOST_PORT}:5173"
     environment:
       CHOKIDAR_USEPOLLING: "true"
-      VITE_API_BASE_URL: /api
-      VITE_DEV_API_PROXY_TARGET: http://api:8080
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL}
+      VITE_DEV_API_PROXY_TARGET: ${VITE_DEV_API_PROXY_TARGET}
     volumes:
       - ../src/frontend/web:/app
       - web-node-modules:/app/node_modules
 
 volumes:
   postgres-data:
-  minio-data:
   api-storage:
   web-node-modules:

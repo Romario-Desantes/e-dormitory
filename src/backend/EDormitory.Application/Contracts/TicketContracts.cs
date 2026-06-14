@@ -4,11 +4,10 @@ using FluentValidation;
 namespace EDormitory.Application.Contracts.Tickets;
 
 public sealed record CreateTicketRequest(
-    Guid CategoryId,
+    string Category,
     string Title,
     string Description,
-    TicketPriority Priority,
-    IReadOnlyCollection<Guid>? AttachmentIds);
+    TicketPriority Priority);
 
 public sealed record UpdateTicketStatusRequest(TicketStatus Status, string? MasterNotes);
 
@@ -25,15 +24,7 @@ public sealed record TicketResponse(
     string? AssignedTo,
     string? MasterNotes,
     DateTimeOffset CreatedAt,
-    DateTimeOffset? ResolvedAt,
-    IReadOnlyCollection<Guid> AttachmentIds);
-
-public sealed record TicketAttachmentResponse(
-    Guid Id,
-    string FileName,
-    string ContentType,
-    long Size,
-    string PreviewUrl);
+    DateTimeOffset? ResolvedAt);
 
 public sealed record TicketDetailResponse(
     Guid Id,
@@ -48,17 +39,15 @@ public sealed record TicketDetailResponse(
     string? AssignedTo,
     string? MasterNotes,
     DateTimeOffset CreatedAt,
-    DateTimeOffset? ResolvedAt,
-    IReadOnlyCollection<TicketAttachmentResponse> Attachments);
+    DateTimeOffset? ResolvedAt);
 
 public sealed class CreateTicketRequestValidator : AbstractValidator<CreateTicketRequest>
 {
     public CreateTicketRequestValidator()
     {
-        RuleFor(x => x.CategoryId).NotEmpty();
+        RuleFor(x => x.Category).NotEmpty().MaximumLength(120);
         RuleFor(x => x.Title).NotEmpty().MaximumLength(160);
         RuleFor(x => x.Description).NotEmpty().MaximumLength(2000);
-        RuleFor(x => x.AttachmentIds).Must(ids => ids is null || ids.Count <= 5);
     }
 }
 

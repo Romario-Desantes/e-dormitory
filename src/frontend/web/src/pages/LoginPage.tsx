@@ -1,12 +1,13 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowRight, Eye, EyeOff, Mail, LockKeyhole } from 'lucide-react'
+import { ArrowRight, Eye, EyeOff, LockKeyhole, Mail } from 'lucide-react'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useNavigate } from 'react-router-dom'
 import { z } from 'zod'
 import { Input, PrimaryButton, TextField } from '../components/AppPrimitives'
 import { getCurrentUser, login } from '../lib/api'
+import logoUrl from '../assets/new_logo.png'
 
 const loginSchema = z.object({
   email: z.string().email('Перевірте, будь ласка, email. Здається, там бракує кількох символів.'),
@@ -55,8 +56,8 @@ export function LoginPage() {
         <section className="w-full rounded-[34px] border border-white/80 bg-white/88 p-4 shadow-[0_40px_100px_-50px_rgba(15,23,42,0.45)] backdrop-blur sm:p-6">
           <div className="rounded-[30px] border border-slate-200 bg-white/95 p-6 shadow-[0_20px_60px_-35px_rgba(15,23,42,0.28)] sm:p-8">
             <div className="mb-7 flex items-center gap-3">
-              <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--color-accent-soft)] text-[var(--color-accent)]">
-                <LockKeyhole className="h-5 w-5" />
+              <span className="inline-flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl bg-white">
+                <img src={logoUrl} alt="e-Dormitory" className="h-full w-full object-contain p-1" />
               </span>
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[var(--color-accent)]">
